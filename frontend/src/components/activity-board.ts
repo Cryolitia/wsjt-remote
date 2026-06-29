@@ -86,36 +86,28 @@ export class ActivityBoard extends LitElement {
 
   private renderWatchedRows() {
     const rows = [];
-    let lastSlot = "";
-    const activities = this.watchedActivities
-      .map((item, order) => ({ item, order }))
-      .sort((left, right) => activityTimeMs(left.item) - activityTimeMs(right.item) || left.order - right.order)
-      .slice(-this.limit)
-      .reverse();
-    for (const { item } of activities) {
-      const slot = timeSlot(item.time);
-      const highlightClass = activityHighlightClass(item);
-      const fullRowHighlight = shouldHighlightFullRow(item);
-      if (slot !== lastSlot) {
-        rows.push(html`<tr><th colspan="7"><small><strong>${slot}</strong></small></th></tr>`);
-        lastSlot = slot;
+    for (const group of groupedWatchedActivities(this.watchedActivities, this.limit)) {
+      rows.push(html`<tr><th colspan="7"><small><strong>${group.slot}</strong></small></th></tr>`);
+      for (const item of group.items) {
+        const highlightClass = activityHighlightClass(item);
+        const fullRowHighlight = shouldHighlightFullRow(item);
+        rows.push(html`
+          <tr class=${fullRowHighlight ? highlightClass : ""}>
+            <td><small><strong>${item.watchCall}</strong></small></td>
+            <td><small>${item.snr}</small></td>
+            <td><small>${formatDt(item.delta_time)}</small></td>
+            <td><small>${item.delta_frequency}</small></td>
+            <td><small class=${activityMessageClass(item, this.status.de_call)}>${item.message}</small></td>
+            <td class=${fullRowHighlight ? "" : highlightClass}><small>${formatDxcc(item)}</small></td>
+            <td>
+              <small>
+                ${item.index >= 0 && item.id !== "local" ? html`<a href="#" @click=${(event: Event) => this.replyFromLink(event, item.index)}>Reply</a> · ` : null}
+                ${item.id !== "local" ? html`<a href="#" @click=${(event: Event) => this.unwatchFromLink(event, item.watchCall)}>Remove</a>` : null}
+              </small>
+            </td>
+          </tr>
+        `);
       }
-      rows.push(html`
-        <tr class=${fullRowHighlight ? highlightClass : ""}>
-          <td><small><strong>${item.watchCall}</strong></small></td>
-          <td><small>${item.snr}</small></td>
-          <td><small>${formatDt(item.delta_time)}</small></td>
-          <td><small>${item.delta_frequency}</small></td>
-          <td><small class=${activityMessageClass(item, this.status.de_call)}>${item.message}</small></td>
-          <td class=${fullRowHighlight ? "" : highlightClass}><small>${formatDxcc(item)}</small></td>
-          <td>
-            <small>
-              ${item.index >= 0 && item.id !== "local" ? html`<a href="#" @click=${(event: Event) => this.replyFromLink(event, item.index)}>Reply</a> · ` : null}
-              ${item.id !== "local" ? html`<a href="#" @click=${(event: Event) => this.unwatchFromLink(event, item.watchCall)}>Remove</a>` : null}
-            </small>
-          </td>
-        </tr>
-      `);
     }
     return rows;
   }
@@ -290,15 +282,37 @@ function activityTimeMs(decode: Decode): number {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
+function groupedWatchedActivities(activities: WatchedActivity[], limit: number): Array<{ slot: string; items: WatchedActivity[] }> {
+  const limited = activities
+    .map((item, order) => ({ item, order }))
+    .sort((left, right) => activityTimeMs(left.item) - activityTimeMs(right.item) || left.order - right.order)
+    .slice(-limit);
+  const groups = new Map<string, Array<{ item: WatchedActivity; order: number }>>();
+  for (const entry of limited) {
+    const slot = timeSlot(entry.item.time);
+    groups.set(slot, [...(groups.get(slot) || []), entry]);
+  }
+  return Array.from(groups.entries())
+    .map(([slot, entries]) => ({
+      slot,
+      newest: Math.max(...entries.map((entry) => activityTimeMs(entry.item))),
+      items: entries
+        .sort((left, right) => activityTimeMs(right.item) - activityTimeMs(left.item) || right.order - left.order)
+        .map((entry) => entry.item),
+    }))
+    .sort((left, right) => right.newest - left.newest)
+    .map(({ slot, items }) => ({ slot, items }));
+}
+
 function activityHighlightClass(decode: Decode): string {
   if (decode.id === "local") return "activity-row--tx";
   if (decode.worked_call_band) return "";
+  if (decode.worked_call === true && decode.worked_call_band === false) return "activity-row--band-call";
   if (decode.dxcc_entity && decode.worked_dxcc === false) return "activity-row--new-dxcc";
   if (decode.dxcc_entity && decode.worked_dxcc === true && decode.worked_dxcc_band === false) return "activity-row--band-dxcc";
   if (decode.worked_grid4 && decode.worked_grid === false) return "activity-row--new-grid";
   if (decode.worked_grid4 && decode.worked_grid === true && decode.worked_grid_band === false) return "activity-row--band-grid";
   if (decode.worked_call === false) return "activity-row--new-call";
-  if (decode.worked_call === true && decode.worked_call_band === false) return "activity-row--band-call";
   return "";
 }
 

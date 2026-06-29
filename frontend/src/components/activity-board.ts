@@ -131,13 +131,11 @@ export class ActivityBoard extends LitElement {
 
   updated(changed: Map<string, unknown>) {
     if (changed.has("decodes")) {
-      for (const decode of this.decodes) this.matchWatched(decode);
+      for (const decode of this.decodes) {
+        this.watchIfCallingOwn(decode);
+        this.matchWatched(decode);
+      }
     }
-  }
-
-  handleLoggedAdif(call: string) {
-    if (!call) return;
-    this.unwatch(call.toUpperCase());
   }
 
   handleTransmit(message: string) {
@@ -164,7 +162,20 @@ export class ActivityBoard extends LitElement {
       this.flash("无法从消息中识别呼号");
       return;
     }
+    this.addWatch(callsign, decode);
+  }
+
+  private watchIfCallingOwn(decode: Decode) {
+    if (decode.id === "local" || !isCallingOwnCall(decode.message, this.status.de_call)) return;
     const now = new Date().toISOString();
+    const callsign = extractCallsign(decode.message, this.status.de_call || "");
+    if (!callsign) return;
+    const existing = this.watched.get(callsign);
+    if (existing?.lastDecode === decode) return;
+    this.addWatch(callsign, decode, now);
+  }
+
+  private addWatch(callsign: string, decode: Decode, now = new Date().toISOString()) {
     const existing = this.watched.get(callsign);
     this.watched.set(callsign, {
       callsign,

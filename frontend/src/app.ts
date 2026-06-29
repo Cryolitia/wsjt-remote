@@ -52,7 +52,7 @@ class WSJTXApp extends LitElement {
   @state() private wsNotice = "";
   private ws?: WebSocket;
   private reconnectTimer?: number;
-  private lastTransmitMessage = "";
+  private wasTransmitting = false;
   @query("activity-board") private activityBoard?: ActivityBoard;
 
   connectedCallback() {
@@ -129,16 +129,11 @@ class WSJTXApp extends LitElement {
     }
     if (payload.event === "decode") this.snapshot = { ...this.snapshot, decodes: [...this.snapshot.decodes, payload.data as Decode].slice(-500) };
     if (payload.event === "clear") this.snapshot = { ...this.snapshot, decodes: [] };
-    if (payload.event === "logged_adif") {
-      const data = payload.data as { call?: string };
-      this.activityBoard?.handleLoggedAdif(data.call || "");
-    }
   }
 
   private async cq() {
     const call = String(this.snapshot.status.de_call || "").trim();
     const grid = String(this.snapshot.status.de_grid || "").trim().slice(0, 4);
-    const text = call && grid ? `CQ ${call} ${grid}` : "CQ";
     const idle = !this.snapshot.status.tx_enabled && !this.snapshot.status.transmitting;
     const message = idle
       ? "CQ set to Tx5; Enable Tx triggered"
@@ -146,15 +141,14 @@ class WSJTXApp extends LitElement {
     await this.action(async () => {
       await postJson("/api/cq");
       if (idle) await postJson("/api/alt-n");
-    }, message, text);
+    }, message);
   }
   private async halt() { await this.action(() => postJson("/api/halt-tx", { auto_tx_only: false }), "Halt sent"); }
   private async clear() { await this.action(() => postJson("/api/clear", { window: 2 }), "Clear sent"); }
 
-  private async action(fn: () => Promise<unknown>, message: string, txMessage = "") {
+  private async action(fn: () => Promise<unknown>, message: string) {
     try {
       await fn();
-      if (txMessage) this.activityBoard?.handleTransmit(txMessage);
       this.flash(message);
     } catch (error) {
       this.flash(String(error));
@@ -162,13 +156,15 @@ class WSJTXApp extends LitElement {
   }
 
   private trackTransmit(status: Status) {
-    const message = String(status.tx_message || "").trim();
-    if (!status.transmitting) {
-      this.lastTransmitMessage = "";
+    const transmitting = Boolean(status.transmitting);
+    if (!transmitting) {
+      this.wasTransmitting = false;
       return;
     }
-    if (!message || message === this.lastTransmitMessage) return;
-    this.lastTransmitMessage = message;
+    if (this.wasTransmitting) return;
+    this.wasTransmitting = true;
+    const message = transmitMessage(status);
+    if (!message) return;
     this.activityBoard?.handleTransmit(message);
   }
 
@@ -176,4 +172,14 @@ class WSJTXApp extends LitElement {
     this.actionNotice = message;
     window.setTimeout(() => (this.actionNotice = ""), 2500);
   }
+}
+
+function transmitMessage(status: Status): string {
+  const explicit = String(status.tx_message || "").trim();
+  if (explicit) return explicit;
+  const ownCall = String(status.de_call || "").trim().toUpperCase();
+  const ownGrid = String(status.de_grid || "").trim().toUpperCase().slice(0, 4);
+  const dxCall = String(status.dx_call || "").trim().toUpperCase();
+  if (!dxCall) return ownCall && ownGrid ? `CQ ${ownCall} ${ownGrid}` : "CQ";
+  return `${dxCall} ${ownCall || "UNKNOWN"} UNKNOWN`;
 }

@@ -59,6 +59,11 @@ class AdifIndex:
         with self._lock:
             return self.qso_count > 0
 
+    @property
+    def has_dxcc_data(self) -> bool:
+        with self._lock:
+            return bool(self.worked_dxcc)
+
     def load_file(self, path: Path) -> None:
         if not path.exists():
             logger.warning("ADIF file does not exist: %s", path)

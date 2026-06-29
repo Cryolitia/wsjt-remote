@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 import re
 from typing import Any
 
-from .adif_index import AdifIndex, worked_status_json
+from .adif_index import AdifIndex, band_from_hz, worked_status_json
 from .dxcc import DxccLookup
 from . import protocol
 
@@ -109,7 +109,16 @@ class AppState:
         if grid:
             item["worked_grid4"] = grid
         if self.adif.has_data:
-            item.update(worked_status_json(self.adif.lookup(call=call, grid=grid, dxcc=match, frequency_hz=self.status.get("dial_frequency"))))
+            current_band = band_from_hz(self.status.get("dial_frequency"))
+            worked = worked_status_json(self.adif.lookup(call=call, grid=grid, dxcc=match, frequency_hz=self.status.get("dial_frequency")))
+            if not current_band:
+                worked.pop("worked_call_band", None)
+                worked.pop("worked_grid_band", None)
+                worked.pop("worked_dxcc_band", None)
+            if not self.adif.has_dxcc_data:
+                worked.pop("worked_dxcc", None)
+                worked.pop("worked_dxcc_band", None)
+            item.update(worked)
 
     def get_decode(self, index: int) -> dict[str, Any] | None:
         for decode in self.decodes:

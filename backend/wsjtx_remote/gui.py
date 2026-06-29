@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 def send_alt_n_to_wsjtx() -> None:
     logger.info("querying niri windows for WSJT/JTDX")
     windows = _niri_windows()
-    window = next((item for item in windows if _matches_wsjtx(item)), None)
+    window = _select_wsjtx_window(windows)
     if window is None:
         logger.warning("no WSJT/JTDX window found among %d windows", len(windows))
         raise RuntimeError("no WSJT/JTDX window found by niri")
@@ -42,11 +42,32 @@ def _niri_windows() -> list[dict[str, Any]]:
 
 
 def _matches_wsjtx(window: dict[str, Any]) -> bool:
-    text = " ".join(
-        str(window.get(key) or "")
-        for key in ("title", "app_id", "app_id_lowercase", "namespace")
-    ).upper()
-    return "WSJT" in text or "JTDX" in text
+    app_id = _window_app_id(window)
+    return app_id in {"jtdx", "wsjtx", "wsjt-x", "org.wsjtx.wsjtx"}
+
+
+def _select_wsjtx_window(windows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    matches = [window for window in windows if _matches_wsjtx(window)]
+    if not matches:
+        return None
+    return max(matches, key=_wsjtx_window_score)
+
+
+def _wsjtx_window_score(window: dict[str, Any]) -> int:
+    title = str(window.get("title") or "").upper()
+    app_id = _window_app_id(window)
+    score = 0
+    if app_id in {"jtdx", "wsjtx", "wsjt-x", "org.wsjtx.wsjtx"}:
+        score += 20
+    if "JTDX  BY" in title or "WSJT-X" in title:
+        score += 20
+    if "频谱" in title or "WIDE GRAPH" in title or "WATERFALL" in title:
+        score -= 40
+    return score
+
+
+def _window_app_id(window: dict[str, Any]) -> str:
+    return str(window.get("app_id") or window.get("app_id_lowercase") or "").strip().lower()
 
 
 def _run(command: list[str], error_message: str) -> subprocess.CompletedProcess[str]:

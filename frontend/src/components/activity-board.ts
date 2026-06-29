@@ -292,6 +292,7 @@ function activityTimeMs(decode: Decode): number {
 
 function activityHighlightClass(decode: Decode): string {
   if (decode.id === "local") return "activity-row--tx";
+  if (decode.worked_call_band) return "";
   if (decode.dxcc_entity && decode.worked_dxcc === false) return "activity-row--new-dxcc";
   if (decode.dxcc_entity && decode.worked_dxcc === true && decode.worked_dxcc_band === false) return "activity-row--band-dxcc";
   if (decode.worked_grid4 && decode.worked_grid === false) return "activity-row--new-grid";

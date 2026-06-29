@@ -181,29 +181,7 @@ def _parse_fields(r: Reader, msg_type: MessageType | int) -> dict[str, Any]:
             fields["revision"] = r.utf8()
         return fields
     if msg_type == MessageType.Status:
-        return {
-            "dial_frequency": r.u64(),
-            "mode": r.utf8(),
-            "dx_call": r.utf8(),
-            "report": r.utf8(),
-            "tx_mode": r.utf8(),
-            "tx_enabled": r.boolean(),
-            "transmitting": r.boolean(),
-            "decoding": r.boolean(),
-            "rx_df": r.u32(),
-            "tx_df": r.u32(),
-            "de_call": r.utf8(),
-            "de_grid": r.utf8(),
-            "dx_grid": r.utf8(),
-            "tx_watchdog": r.boolean(),
-            "sub_mode": r.utf8(),
-            "fast_mode": r.boolean(),
-            "special_operation_mode": r.u8(),
-            "frequency_tolerance": r.u32(),
-            "tr_period": r.u32(),
-            "configuration_name": r.utf8(),
-            "tx_message": r.utf8(),
-        }
+        return _parse_status(r)
     if msg_type == MessageType.Decode:
         return _parse_decode(r)
     if msg_type == MessageType.Clear:
@@ -240,6 +218,39 @@ def _parse_decode(r: Reader) -> dict[str, Any]:
         "low_confidence": r.boolean(),
         "off_air": r.boolean(),
     }
+
+
+def _parse_status(r: Reader) -> dict[str, Any]:
+    fields: dict[str, Any] = {
+        "dial_frequency": r.u64(),
+        "mode": r.utf8(),
+        "dx_call": r.utf8(),
+        "report": r.utf8(),
+        "tx_mode": r.utf8(),
+        "tx_enabled": r.boolean(),
+        "transmitting": r.boolean(),
+        "decoding": r.boolean(),
+        "rx_df": r.u32(),
+        "tx_df": r.u32(),
+        "de_call": r.utf8(),
+        "de_grid": r.utf8(),
+        "dx_grid": r.utf8(),
+    }
+    optional_fields = (
+        ("tx_watchdog", r.boolean, 1),
+        ("sub_mode", r.utf8, 4),
+        ("fast_mode", r.boolean, 1),
+        ("special_operation_mode", r.u8, 1),
+        ("frequency_tolerance", r.u32, 4),
+        ("tr_period", r.u32, 4),
+        ("configuration_name", r.utf8, 4),
+        ("tx_message", r.utf8, 4),
+    )
+    for name, read, minimum_size in optional_fields:
+        if r.remaining() < minimum_size:
+            break
+        fields[name] = read()
+    return fields
 
 
 def build_message(msg_type: MessageType, msg_id: str, schema: int = SCHEMA) -> Writer:

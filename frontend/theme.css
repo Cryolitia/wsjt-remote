@@ -560,7 +560,7 @@ tbody tr:is(:hover, :focus-within) td {
 }
 
 .activity-row--band-dxcc {
-  --activity-row-bg: color-mix(in srgb, var(--nord12) 48%, var(--app-surface));
+  --activity-row-bg: color-mix(in srgb, var(--nord12) 78%, var(--app-surface));
   --activity-row-fg: var(--nord0);
   --activity-row-link: var(--nord0);
 }

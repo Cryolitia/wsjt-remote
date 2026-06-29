@@ -566,25 +566,25 @@ tbody tr:is(:hover, :focus-within) td {
 }
 
 .activity-row--new-grid {
-  --activity-row-bg: color-mix(in srgb, var(--nord13) 96%, var(--app-surface));
-  --activity-row-fg: var(--nord0);
-  --activity-row-link: var(--nord0);
-}
-
-.activity-row--band-grid {
-  --activity-row-bg: color-mix(in srgb, var(--nord13) 38%, var(--app-surface));
-  --activity-row-fg: var(--nord0);
-  --activity-row-link: var(--nord0);
-}
-
-.activity-row--new-call {
   --activity-row-bg: color-mix(in srgb, var(--nord15) 92%, var(--app-surface));
   --activity-row-fg: var(--nord0);
   --activity-row-link: var(--nord0);
 }
 
-.activity-row--band-call {
+.activity-row--band-grid {
   --activity-row-bg: color-mix(in srgb, var(--nord15) 34%, var(--app-surface));
+  --activity-row-fg: var(--nord0);
+  --activity-row-link: var(--nord0);
+}
+
+.activity-row--new-call {
+  --activity-row-bg: color-mix(in srgb, var(--nord13) 96%, var(--app-surface));
+  --activity-row-fg: var(--nord0);
+  --activity-row-link: var(--nord0);
+}
+
+.activity-row--band-call {
+  --activity-row-bg: color-mix(in srgb, var(--nord13) 38%, var(--app-surface));
   --activity-row-fg: var(--nord0);
   --activity-row-link: var(--nord0);
 }

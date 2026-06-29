@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
-from aiohttp import web, WSMsgType
+from aiohttp import web, WSCloseCode, WSMsgType
 
 from . import protocol
 from .gui import send_alt_n_to_wsjtx
@@ -57,6 +58,7 @@ async def create_app(state: AppState, static_dir: Path) -> web.Application:
             state.websockets.discard(ws)
 
     app["broadcast"] = broadcast
+    app.on_shutdown.append(close_websockets)
 
     app.router.add_get("/", index)
     app.router.add_get("/debug", debug_page)
@@ -75,6 +77,17 @@ async def create_app(state: AppState, static_dir: Path) -> web.Application:
     app.router.add_post("/api/debug/send", api_debug_send)
     app.router.add_route("OPTIONS", "/{tail:.*}", lambda request: web.Response(headers=_cors_headers()))
     return app
+
+
+async def close_websockets(app: web.Application) -> None:
+    state: AppState = app["state"]
+    websockets = set(state.websockets)
+    for ws in websockets:
+        try:
+            await asyncio.wait_for(ws.close(code=WSCloseCode.GOING_AWAY, message=b"Server shutdown"), timeout=0.5)
+        except asyncio.TimeoutError:
+            logger.debug("timed out closing websocket during shutdown")
+    state.websockets.difference_update(websockets)
 
 
 def _file_response(request: web.Request, name: str) -> web.FileResponse:

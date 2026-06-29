@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import logging
 from pathlib import Path
+import signal
 
 from aiohttp import web
 
@@ -32,22 +34,30 @@ async def run(args: argparse.Namespace) -> None:
     app = await create_app(state, Path(args.static_dir).resolve())
     broadcaster = app["broadcast"]
     transport = await start_udp(state, broadcaster, args.udp_host, args.udp_port)
-    asyncio.create_task(heartbeat_loop(state, broadcaster))
+    heartbeat_task = asyncio.create_task(heartbeat_loop(state, broadcaster), name="wsjt-remote-heartbeat")
 
-    runner = web.AppRunner(app)
+    runner = web.AppRunner(app, shutdown_timeout=2)
     await runner.setup()
     site = web.TCPSite(runner, args.web_host, args.web_port)
     await site.start()
     logger.info("web listening on http://%s:%s/", args.web_host, args.web_port)
     logger.info("udp listening on %s:%s", args.udp_host, args.udp_port)
     logger.info("static files from %s", Path(args.static_dir).resolve())
+    stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        with contextlib.suppress(NotImplementedError):
+            loop.add_signal_handler(sig, stop_event.set)
     try:
-        while True:
-            await asyncio.sleep(3600)
+        await stop_event.wait()
     finally:
         logger.info("shutting down")
+        heartbeat_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await heartbeat_task
         transport.close()
-        await runner.cleanup()
+        with contextlib.suppress(asyncio.TimeoutError):
+            await asyncio.wait_for(runner.cleanup(), timeout=2)
 
 
 def build_parser() -> argparse.ArgumentParser:

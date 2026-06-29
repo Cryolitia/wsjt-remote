@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>WSJT-X Remote</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script type="importmap">
+      {
+        "imports": {
+          "lit": "https://cdn.jsdelivr.net/npm/lit@3/+esm",
+          "lit/decorators.js": "https://cdn.jsdelivr.net/npm/lit@3/decorators.js/+esm"
+        }
+      }
+    </script>
+    <script type="module" src="./dist/app.js?v=@cacheBuster@"></script>
+  </head>
+  <body>
+    <main class="container-fluid">
+      <wsjtx-app></wsjtx-app>
+    </main>
+  </body>
+</html>

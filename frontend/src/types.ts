@@ -39,6 +39,17 @@ export type Decode = {
   delta_frequency: number;
   mode: string;
   message: string;
+  dxcc_call?: string;
+  dxcc_prefix?: string;
+  dxcc_entity?: string;
+  dxcc_label?: string;
+  worked_call?: boolean;
+  worked_call_band?: boolean;
+  worked_grid?: boolean;
+  worked_grid_band?: boolean;
+  worked_dxcc?: boolean;
+  worked_dxcc_band?: boolean;
+  worked_grid4?: string;
   low_confidence: boolean;
   off_air: boolean;
 };

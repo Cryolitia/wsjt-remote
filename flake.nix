@@ -42,7 +42,7 @@
                 --external:lit \
                 --external:lit/* \
                 --outdir=dist
-              sha256sum dist/app.js dist/debug.js | sha256sum | cut -c1-16 > .cache-buster
+              sha256sum dist/app.js dist/debug.js theme.css | sha256sum | cut -c1-16 > .cache-buster
               runHook postBuild
             '';
 
@@ -52,6 +52,7 @@
               cache_buster="$(cat .cache-buster)"
               substitute index.html $out/index.html --subst-var-by cacheBuster "$cache_buster"
               substitute debug.html $out/debug.html --subst-var-by cacheBuster "$cache_buster"
+              cp theme.css $out/theme.css
               cp -r dist $out/
               runHook postInstall
             '';
@@ -118,39 +119,7 @@
 
               export PATH=${pkgs.niri}/bin:${pkgs.wtype}/bin:\$PATH
 
-              frontend_host="\''${FRONTEND_HOST:-127.0.0.1}"
-              frontend_port="\''${FRONTEND_PORT:-5173}"
-
-              ${backend}/bin/wsjt-remote-backend --static-dir ${frontend} "\$@" &
-              backend_pid="\$!"
-
-              echo "Frontend: http://\$frontend_host:\$frontend_port/"
-              cd ${frontend}
-              ${python}/bin/python -c '
-              import http.server
-              import sys
-
-              host = sys.argv[1]
-              port = int(sys.argv[2])
-
-              class Handler(http.server.SimpleHTTPRequestHandler):
-                  def end_headers(self):
-                      self.send_header("Cache-Control", "no-store, max-age=0")
-                      super().end_headers()
-
-              http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
-              ' "\$frontend_host" "\$frontend_port" &
-              frontend_pid="\$!"
-
-              cleanup() {
-                kill "\$backend_pid" 2>/dev/null || true
-                kill "\$frontend_pid" 2>/dev/null || true
-                wait "\$backend_pid" 2>/dev/null || true
-                wait "\$frontend_pid" 2>/dev/null || true
-              }
-              trap cleanup EXIT INT TERM
-
-              wait -n "\$backend_pid" "\$frontend_pid"
+              exec ${backend}/bin/wsjt-remote-backend --static-dir ${frontend} "\$@"
               EOF
               chmod +x $out/bin/wsjt-remote
 

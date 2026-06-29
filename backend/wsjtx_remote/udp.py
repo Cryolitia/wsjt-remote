@@ -63,7 +63,8 @@ class WSJTXUDPProtocol(asyncio.DatagramProtocol):
         elif msg.type == protocol.MessageType.LoggedADIF:
             adif = str(msg.fields.get("adif") or "")
             call = extract_adif_call(adif)
-            logger.info("logged adif call=%s", call or "")
+            indexed = self.state.adif.add_adif(adif)
+            logger.info("logged adif call=%s indexed=%s", call or "", indexed)
             await self.broadcaster({"event": "logged_adif", "data": {"adif": adif, "call": call}})
 
 

@@ -39,7 +39,7 @@ export class ActivityBoard extends LitElement {
             </nav>
           </header>
           <table>
-            <thead><tr><th>Sig</th><th>DT</th><th>Freq</th><th>Message</th><th></th></tr></thead>
+            <thead><tr><th>Sig</th><th>DT</th><th>Freq</th><th>Message</th><th>DXCC</th><th></th></tr></thead>
             <tbody>${this.renderDecodeRows()}</tbody>
           </table>
         </article>
@@ -51,7 +51,7 @@ export class ActivityBoard extends LitElement {
             </nav>
           </header>
           <table>
-            <thead><tr><th>Call</th><th>Sig</th><th>DT</th><th>Freq</th><th>Message</th><th></th></tr></thead>
+            <thead><tr><th>Call</th><th>Sig</th><th>DT</th><th>Freq</th><th>Message</th><th>DXCC</th><th></th></tr></thead>
             <tbody>${this.renderWatchedRows()}</tbody>
           </table>
         </article>
@@ -64,16 +64,19 @@ export class ActivityBoard extends LitElement {
     let lastSlot = "";
     for (const decode of this.decodes.slice(-this.limit).reverse()) {
       const slot = timeSlot(decode.time);
+      const highlightClass = activityHighlightClass(decode);
+      const fullRowHighlight = shouldHighlightFullRow(decode);
       if (slot !== lastSlot) {
-        rows.push(html`<tr><th colspan="5"><small><strong>${slot}</strong></small></th></tr>`);
+        rows.push(html`<tr><th colspan="6"><small><strong>${slot}</strong></small></th></tr>`);
         lastSlot = slot;
       }
       rows.push(html`
-        <tr @dblclick=${() => this.watch(decode)}>
+        <tr class=${fullRowHighlight ? highlightClass : ""} @dblclick=${() => this.watch(decode)}>
           <td><small><strong>${decode.snr}</strong></small></td>
           <td><small>${formatDt(decode.delta_time)}</small></td>
           <td><small>${decode.delta_frequency}</small></td>
-          <td><small>${decode.message}</small></td>
+          <td><small class=${activityMessageClass(decode, this.status.de_call)}>${decode.message}</small></td>
+          <td class=${fullRowHighlight ? "" : highlightClass}><small>${formatDxcc(decode)}</small></td>
           <td><small><a href="#" @click=${(event: Event) => this.replyAndWatchFromLink(event, decode)}>Reply</a></small></td>
         </tr>
       `);
@@ -86,17 +89,20 @@ export class ActivityBoard extends LitElement {
     let lastSlot = "";
     for (const item of this.watchedActivities.slice(-this.limit).reverse()) {
       const slot = timeSlot(item.time);
+      const highlightClass = activityHighlightClass(item);
+      const fullRowHighlight = shouldHighlightFullRow(item);
       if (slot !== lastSlot) {
-        rows.push(html`<tr><th colspan="6"><small><strong>${slot}</strong></small></th></tr>`);
+        rows.push(html`<tr><th colspan="7"><small><strong>${slot}</strong></small></th></tr>`);
         lastSlot = slot;
       }
       rows.push(html`
-        <tr>
+        <tr class=${fullRowHighlight ? highlightClass : ""}>
           <td><small><strong>${item.watchCall}</strong></small></td>
           <td><small>${item.snr}</small></td>
           <td><small>${formatDt(item.delta_time)}</small></td>
           <td><small>${item.delta_frequency}</small></td>
-          <td><small>${item.message}</small></td>
+          <td><small class=${activityMessageClass(item, this.status.de_call)}>${item.message}</small></td>
+          <td class=${fullRowHighlight ? "" : highlightClass}><small>${formatDxcc(item)}</small></td>
           <td>
             <small>
               ${item.index >= 0 && item.id !== "local" ? html`<a href="#" @click=${(event: Event) => this.replyFromLink(event, item.index)}>Reply</a> · ` : null}
@@ -225,11 +231,13 @@ export class ActivityBoard extends LitElement {
 
 function extractCallsign(message: string, ownCall: string): string {
   const words = message.toUpperCase().split(/\s+/).filter(Boolean);
-  const own = ownCall.toUpperCase();
   if (words[0] === "CQ") {
     return words.find((word, index) => index > 0 && isCall(word)) || "";
   }
-  return words.find((word) => isCall(word) && word !== own) || "";
+  const calls = words.filter(isCall);
+  if (calls.length >= 2) return calls[1];
+  const own = ownCall.toUpperCase();
+  return calls.find((word) => word !== own) || "";
 }
 
 function extractGrid(message: string): string | undefined {
@@ -250,4 +258,39 @@ function timeSlot(time: string): string {
 
 function formatDt(value: number): string {
   return value.toFixed(1);
+}
+
+function formatDxcc(decode: Decode): string {
+  return decode.dxcc_label || decode.dxcc_entity || "-";
+}
+
+function activityHighlightClass(decode: Decode): string {
+  if (decode.id === "local") return "activity-row--tx";
+  if (decode.dxcc_entity && decode.worked_dxcc === false) return "activity-row--new-dxcc";
+  if (decode.dxcc_entity && decode.worked_dxcc === true && decode.worked_dxcc_band === false) return "activity-row--band-dxcc";
+  if (decode.worked_grid === false) return "activity-row--new-grid";
+  if (decode.worked_grid === true && decode.worked_grid_band === false) return "activity-row--band-grid";
+  if (decode.worked_call === false) return "activity-row--new-call";
+  if (decode.worked_call === true && decode.worked_call_band === false) return "activity-row--band-call";
+  return "";
+}
+
+function shouldHighlightFullRow(decode: Decode): boolean {
+  if (decode.id === "local") return true;
+  const words = decode.message.toUpperCase().split(/\s+/).filter(Boolean);
+  return words.some((word) => word === "CQ" || word === "73" || word === "RRR" || word === "RR73");
+}
+
+function activityMessageClass(decode: Decode, ownCall?: string): string {
+  const classes = [];
+  if (decode.worked_call_band) classes.push("activity-message--worked-call");
+  if (isCallingOwnCall(decode.message, ownCall)) classes.push("activity-message--calling-own");
+  return classes.join(" ");
+}
+
+function isCallingOwnCall(message: string, ownCall?: string): boolean {
+  const own = ownCall?.toUpperCase();
+  if (!own) return false;
+  const words = message.toUpperCase().split(/\s+/).filter(Boolean);
+  return words[0] === own;
 }

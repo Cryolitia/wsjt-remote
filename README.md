@@ -82,11 +82,10 @@ Run only the backend:
 nix run .#backend
 ```
 
-This starts both services:
+This starts one web service that serves both the frontend and backend API:
 
 ```text
-Backend:  http://127.0.0.1:8080/
-Frontend: http://127.0.0.1:5173/
+http://127.0.0.1:8080/
 ```
 
 Pass backend arguments after `--`:
@@ -95,16 +94,16 @@ Pass backend arguments after `--`:
 nix run .#wsjt-remote -- --web-host 0.0.0.0
 ```
 
+Load a read-only ADIF log for worked-before lookup:
+
+```bash
+nix run .#wsjt-remote -- --adif ./wsjtx_log.adi
+```
+
 Logs are written to stderr. Use `--log-level` to change verbosity:
 
 ```bash
 nix run .#wsjt-remote -- --log-level DEBUG
-```
-
-The frontend server can be changed with environment variables:
-
-```bash
-FRONTEND_HOST=0.0.0.0 FRONTEND_PORT=5173 nix run .#wsjt-remote
 ```
 
 Open:

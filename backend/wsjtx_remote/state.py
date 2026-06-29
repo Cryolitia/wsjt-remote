@@ -6,6 +6,8 @@ from datetime import UTC, datetime
 import re
 from typing import Any
 
+from .adif_index import AdifIndex, worked_status_json
+from .dxcc import DxccLookup
 from . import protocol
 
 
@@ -14,6 +16,7 @@ def utc_now() -> str:
 
 
 CALL_RE = re.compile(r"<CALL:(\d+)>\s*([^<\s]+)", re.IGNORECASE)
+GRID_RE = re.compile(r"^[A-R]{2}\d{2}([A-X]{2})?$")
 
 
 @dataclass(slots=True)
@@ -57,6 +60,11 @@ class AppState:
     websockets: set[Any] = field(default_factory=set)
     udp_transport: Any = None
     next_decode_index: int = 1
+    dxcc: DxccLookup = field(default_factory=DxccLookup)
+    adif: AdifIndex = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.adif = AdifIndex(self.dxcc)
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -83,9 +91,25 @@ class AppState:
         item["index"] = self.next_decode_index
         item["id"] = msg.id
         item["received_at"] = utc_now()
+        self._add_dxcc(item)
         self.next_decode_index += 1
         self.decodes.append(item)
         return item
+
+    def _add_dxcc(self, item: dict[str, Any]) -> None:
+        call = extract_decode_callsign(str(item.get("message") or ""), str(self.status.get("de_call") or ""))
+        if call:
+            item["dxcc_call"] = call
+        match = self.dxcc.lookup(call) if call else None
+        if match:
+            item["dxcc_prefix"] = match.prefix
+            item["dxcc_entity"] = match.entity
+            item["dxcc_label"] = match.label
+        grid = extract_decode_grid(str(item.get("message") or ""))
+        if grid:
+            item["worked_grid4"] = grid
+        if self.adif.has_data:
+            item.update(worked_status_json(self.adif.lookup(call=call, grid=grid, dxcc=match, frequency_hz=self.status.get("dial_frequency"))))
 
     def get_decode(self, index: int) -> dict[str, Any] | None:
         for decode in self.decodes:
@@ -120,3 +144,32 @@ def extract_adif_call(adif: str) -> str:
         return ""
     length = int(match.group(1))
     return match.group(2)[:length].upper()
+
+
+def extract_decode_callsign(message: str, own_call: str) -> str:
+    words = [word for word in message.upper().split() if word]
+    if words and words[0] == "CQ":
+        for index, word in enumerate(words):
+            if index > 0 and is_call(word):
+                return word
+        return ""
+    calls = [word for word in words if is_call(word)]
+    if len(calls) >= 2:
+        return calls[1]
+    own = own_call.upper()
+    return next((word for word in calls if word != own), "")
+
+
+def extract_decode_grid(message: str) -> str:
+    for word in message.upper().split():
+        if is_grid(word):
+            return word[:4]
+    return ""
+
+
+def is_call(word: str) -> bool:
+    return not is_grid(word) and bool(re.match(r"^[A-Z0-9/]{3,12}$", word)) and any(ch.isdigit() for ch in word) and any(ch.isalpha() for ch in word)
+
+
+def is_grid(word: str) -> bool:
+    return bool(GRID_RE.match(word))

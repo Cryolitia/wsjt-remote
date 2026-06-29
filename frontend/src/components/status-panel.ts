@@ -27,7 +27,7 @@ export class StatusPanel extends LitElement {
           <div><small>Schema</small><br>${remote?.schema || "-"}</div>
           <div><small>Frequency</small><br>${mhz} MHz</div>
           <div><small>Mode</small><br>${status.mode || "-"}</div>
-          <div><small>Tx</small><br>${status.transmitting ? "Transmitting" : status.tx_enabled ? "Enabled" : "Idle"}</div>
+          <div class=${txStatusClass(status)}><small>Tx</small><br>${status.transmitting ? "Transmitting" : status.tx_enabled ? "Enabled" : "Idle"}</div>
           <div><small>DE</small><br>${status.de_call || "-"} ${status.de_grid || ""}</div>
           <div><small>DX</small><br>${status.dx_call || "-"} ${status.dx_grid || ""}</div>
         </div>
@@ -35,4 +35,10 @@ export class StatusPanel extends LitElement {
       </article>
     `;
   }
+}
+
+function txStatusClass(status: Status): string {
+  if (status.transmitting) return "status-tx--transmitting";
+  if (status.tx_enabled) return "status-tx--enabled";
+  return "";
 }

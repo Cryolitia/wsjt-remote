@@ -60,6 +60,7 @@ async def create_app(state: AppState, static_dir: Path) -> web.Application:
 
     app.router.add_get("/", index)
     app.router.add_get("/debug", debug_page)
+    app.router.add_get("/theme.css", theme_css)
     app.router.add_get("/ws", websocket)
     app.router.add_get("/dist/{name}", dist_file)
     app.router.add_get("/api/state", api_state)
@@ -80,7 +81,7 @@ def _file_response(request: web.Request, name: str) -> web.FileResponse:
     path = Path(request.app["static_dir"]) / name
     if not path.exists():
         raise web.HTTPNotFound(text="Frontend not built. Run: cd frontend && npm install && npm run build")
-    return web.FileResponse(path)
+    return web.FileResponse(path, headers={"Cache-Control": "no-store, max-age=0"})
 
 
 async def index(request: web.Request) -> web.FileResponse:
@@ -89,6 +90,10 @@ async def index(request: web.Request) -> web.FileResponse:
 
 async def debug_page(request: web.Request) -> web.FileResponse:
     return _file_response(request, "debug.html")
+
+
+async def theme_css(request: web.Request) -> web.FileResponse:
+    return _file_response(request, "theme.css")
 
 
 async def dist_file(request: web.Request) -> web.FileResponse:

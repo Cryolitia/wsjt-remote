@@ -7,6 +7,40 @@ import "./components/activity-board";
 import type { Decode, Snapshot, Status } from "./types";
 import type { ActivityBoard } from "./components/activity-board";
 
+@customElement("utc-clock")
+class UtcClock extends LitElement {
+  createRenderRoot() {
+    return this;
+  }
+
+  @state() private now = new Date();
+  private timer?: number;
+
+  connectedCallback() {
+    super.connectedCallback();
+    this.tick();
+    this.timer = window.setInterval(() => this.tick(), 1000);
+  }
+
+  disconnectedCallback() {
+    if (this.timer) window.clearInterval(this.timer);
+    super.disconnectedCallback();
+  }
+
+  render() {
+    const iso = this.now.toISOString().replace(/\.\d{3}Z$/, "Z");
+    return html`
+      <section class="utc-clock" aria-label="Current UTC time">
+        <time datetime=${iso}>${iso}</time>
+      </section>
+    `;
+  }
+
+  private tick() {
+    this.now = new Date();
+  }
+}
+
 @customElement("wsjtx-app")
 class WSJTXApp extends LitElement {
   createRenderRoot() {
@@ -33,7 +67,9 @@ class WSJTXApp extends LitElement {
   }
 
   render() {
+    const txIdle = !this.snapshot.status.tx_enabled && !this.snapshot.status.transmitting;
     return html`
+      <utc-clock></utc-clock>
       <nav>
         <ul><li><strong>WSJT-X Remote</strong></li></ul>
         <ul><li><a href="/debug">Debug</a></li></ul>
@@ -45,7 +81,7 @@ class WSJTXApp extends LitElement {
       <article>
         <fieldset role="group">
           <button @click=${this.cq}>CQ</button>
-          <button class="contrast" @click=${this.halt}>Halt TX</button>
+          <button class=${txIdle ? "secondary" : "contrast"} @click=${this.halt}>Halt TX</button>
           <button class="secondary" @click=${this.clear}>Clear</button>
         </fieldset>
       </article>

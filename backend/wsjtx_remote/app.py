@@ -25,6 +25,10 @@ async def run(args: argparse.Namespace) -> None:
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
     state = AppState()
+    if args.adif:
+        state.dxcc.load()
+        state.adif.load_file(Path(args.adif).expanduser().resolve())
+    state.dxcc.start_background_refresh()
     app = await create_app(state, Path(args.static_dir).resolve())
     broadcaster = app["broadcast"]
     transport = await start_udp(state, broadcaster, args.udp_host, args.udp_port)
@@ -53,6 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--web-host", default="127.0.0.1")
     parser.add_argument("--web-port", type=int, default=8080)
     parser.add_argument("--static-dir", default=str(default_static_dir()))
+    parser.add_argument("--adif", default="", help="Path to a read-only ADIF log used for worked-before lookups")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return parser
 

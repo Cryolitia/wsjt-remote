@@ -191,8 +191,10 @@ export class ActivityBoard extends LitElement {
   }
 
   private matchWatched(decode: Decode) {
+    const sourceCall = extractCallsign(decode.message, this.status.de_call || "");
+    if (!sourceCall) return;
     for (const [call, item] of this.watched) {
-      if (decode.message.toUpperCase().includes(call)) {
+      if (sourceCall === call) {
         this.watched.set(call, { ...item, lastSeen: new Date().toISOString(), lastDecode: decode });
         this.addWatchedActivity(call, decode);
       }

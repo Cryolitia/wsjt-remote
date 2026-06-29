@@ -61,6 +61,7 @@ class AppState:
     udp_transport: Any = None
     next_decode_index: int = 1
     dxcc: DxccLookup = field(default_factory=DxccLookup)
+    call_grids: dict[str, str] = field(default_factory=dict)
     adif: AdifIndex = field(init=False)
 
     def __post_init__(self) -> None:
@@ -106,14 +107,26 @@ class AppState:
             item["dxcc_entity"] = match.entity
             item["dxcc_label"] = match.label
         grid = extract_decode_grid(str(item.get("message") or ""))
-        if grid:
-            item["worked_grid4"] = grid
+        if call and grid:
+            self.call_grids[call] = grid
+        lookup_grid = grid or self.call_grids.get(call, "")
+        if lookup_grid:
+            item["worked_grid4"] = lookup_grid
         if self.adif.has_data:
             current_band = band_from_hz(self.status.get("dial_frequency"))
-            worked = worked_status_json(self.adif.lookup(call=call, grid=grid, dxcc=match, frequency_hz=self.status.get("dial_frequency")))
+            worked = worked_status_json(self.adif.lookup(call=call, grid=lookup_grid, dxcc=match, frequency_hz=self.status.get("dial_frequency")))
             if not current_band:
                 worked.pop("worked_call_band", None)
                 worked.pop("worked_grid_band", None)
+                worked.pop("worked_dxcc_band", None)
+            if not call:
+                worked.pop("worked_call", None)
+                worked.pop("worked_call_band", None)
+            if not lookup_grid or not self.adif.has_grid_data:
+                worked.pop("worked_grid", None)
+                worked.pop("worked_grid_band", None)
+            if not match:
+                worked.pop("worked_dxcc", None)
                 worked.pop("worked_dxcc_band", None)
             if not self.adif.has_dxcc_data:
                 worked.pop("worked_dxcc", None)

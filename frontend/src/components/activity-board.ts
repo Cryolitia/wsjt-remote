@@ -279,8 +279,8 @@ function activityHighlightClass(decode: Decode): string {
   if (decode.id === "local") return "activity-row--tx";
   if (decode.dxcc_entity && decode.worked_dxcc === false) return "activity-row--new-dxcc";
   if (decode.dxcc_entity && decode.worked_dxcc === true && decode.worked_dxcc_band === false) return "activity-row--band-dxcc";
-  if (decode.worked_grid === false) return "activity-row--new-grid";
-  if (decode.worked_grid === true && decode.worked_grid_band === false) return "activity-row--band-grid";
+  if (decode.worked_grid4 && decode.worked_grid === false) return "activity-row--new-grid";
+  if (decode.worked_grid4 && decode.worked_grid === true && decode.worked_grid_band === false) return "activity-row--band-grid";
   if (decode.worked_call === false) return "activity-row--new-call";
   if (decode.worked_call === true && decode.worked_call_band === false) return "activity-row--band-call";
   return "";

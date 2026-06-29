@@ -64,6 +64,11 @@ class AdifIndex:
         with self._lock:
             return bool(self.worked_dxcc)
 
+    @property
+    def has_grid_data(self) -> bool:
+        with self._lock:
+            return bool(self.worked_grids)
+
     def load_file(self, path: Path) -> None:
         if not path.exists():
             logger.warning("ADIF file does not exist: %s", path)

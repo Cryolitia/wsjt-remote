@@ -47,7 +47,10 @@ export class ActivityBoard extends LitElement {
           <header>
             <nav>
               <ul><li><strong>Watch List</strong></li></ul>
-              <ul><li><small>${Array.from(this.watched.keys()).join(", ")}</small></li></ul>
+              <ul>
+                <li><small>${Array.from(this.watched.keys()).join(", ")}</small></li>
+                ${this.watched.size || this.watchedActivities.length ? html`<li><small><a href="#" @click=${this.clearWatchFromLink}>Clear</a></small></li>` : null}
+              </ul>
             </nav>
           </header>
           <table>
@@ -156,6 +159,13 @@ export class ActivityBoard extends LitElement {
   clearMessages() {
     this.watchedActivities = [];
     this.watchedActivityKeys.clear();
+  }
+
+  private clearWatchFromLink(event: Event) {
+    event.preventDefault();
+    this.watched.clear();
+    this.clearMessages();
+    this.watched = new Map(this.watched);
   }
 
   private watch(decode: Decode) {

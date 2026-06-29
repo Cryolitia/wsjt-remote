@@ -170,15 +170,15 @@ def extract_adif_call(adif: str) -> str:
 
 def extract_decode_callsign(message: str, own_call: str) -> str:
     words = [word for word in message.upper().split() if word]
+    own = own_call.upper()
     if words and words[0] == "CQ":
         for index, word in enumerate(words):
-            if index > 0 and is_call(word):
+            if index > 0 and is_call(word) and word != own:
                 return word
         return ""
     calls = [word for word in words if is_call(word)]
     if len(calls) >= 2:
-        return calls[1]
-    own = own_call.upper()
+        return calls[1] if calls[1] != own else ""
     return next((word for word in calls if word != own), "")
 
 

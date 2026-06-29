@@ -87,7 +87,12 @@ export class ActivityBoard extends LitElement {
   private renderWatchedRows() {
     const rows = [];
     let lastSlot = "";
-    for (const item of this.watchedActivities.slice(-this.limit).reverse()) {
+    const activities = this.watchedActivities
+      .map((item, order) => ({ item, order }))
+      .sort((left, right) => activityTimeMs(left.item) - activityTimeMs(right.item) || left.order - right.order)
+      .slice(-this.limit)
+      .reverse();
+    for (const { item } of activities) {
       const slot = timeSlot(item.time);
       const highlightClass = activityHighlightClass(item);
       const fullRowHighlight = shouldHighlightFullRow(item);
@@ -242,12 +247,12 @@ export class ActivityBoard extends LitElement {
 
 function extractCallsign(message: string, ownCall: string): string {
   const words = message.toUpperCase().split(/\s+/).filter(Boolean);
+  const own = ownCall.toUpperCase();
   if (words[0] === "CQ") {
-    return words.find((word, index) => index > 0 && isCall(word)) || "";
+    return words.find((word, index) => index > 0 && isCall(word) && word !== own) || "";
   }
   const calls = words.filter(isCall);
-  if (calls.length >= 2) return calls[1];
-  const own = ownCall.toUpperCase();
+  if (calls.length >= 2) return calls[1] !== own ? calls[1] : "";
   return calls.find((word) => word !== own) || "";
 }
 
@@ -275,6 +280,11 @@ function formatDxcc(decode: Decode): string {
   return decode.dxcc_label || decode.dxcc_entity || "-";
 }
 
+function activityTimeMs(decode: Decode): number {
+  const timestamp = Date.parse(decode.received_at);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 function activityHighlightClass(decode: Decode): string {
   if (decode.id === "local") return "activity-row--tx";
   if (decode.dxcc_entity && decode.worked_dxcc === false) return "activity-row--new-dxcc";
@@ -294,7 +304,7 @@ function shouldHighlightFullRow(decode: Decode): boolean {
 
 function activityMessageClass(decode: Decode, ownCall?: string): string {
   const classes = [];
-  if (decode.worked_call_band) classes.push("activity-message--worked-call");
+  if (decode.dxcc_call && decode.dxcc_call !== ownCall?.toUpperCase() && decode.worked_call_band) classes.push("activity-message--worked-call");
   if (isCallingOwnCall(decode.message, ownCall)) classes.push("activity-message--calling-own");
   return classes.join(" ");
 }

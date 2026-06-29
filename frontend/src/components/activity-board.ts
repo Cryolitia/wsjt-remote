@@ -161,6 +161,11 @@ export class ActivityBoard extends LitElement {
     });
   }
 
+  clearMessages() {
+    this.watchedActivities = [];
+    this.watchedActivityKeys.clear();
+  }
+
   private watch(decode: Decode) {
     const callsign = extractCallsign(decode.message, this.status.de_call || "");
     if (!callsign) {

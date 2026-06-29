@@ -128,7 +128,10 @@ class WSJTXApp extends LitElement {
       this.trackTransmit(status);
     }
     if (payload.event === "decode") this.snapshot = { ...this.snapshot, decodes: [...this.snapshot.decodes, payload.data as Decode].slice(-500) };
-    if (payload.event === "clear") this.snapshot = { ...this.snapshot, decodes: [] };
+    if (payload.event === "clear") {
+      this.snapshot = { ...this.snapshot, decodes: [] };
+      this.activityBoard?.clearMessages();
+    }
   }
 
   private async cq() {
@@ -144,7 +147,13 @@ class WSJTXApp extends LitElement {
     }, message);
   }
   private async halt() { await this.action(() => postJson("/api/halt-tx", { auto_tx_only: false }), "Halt sent"); }
-  private async clear() { await this.action(() => postJson("/api/clear", { window: 2 }), "Clear sent"); }
+  private async clear() {
+    await this.action(async () => {
+      await postJson("/api/clear", { window: 2 });
+      this.snapshot = { ...this.snapshot, decodes: [] };
+      this.activityBoard?.clearMessages();
+    }, "Clear sent");
+  }
 
   private async action(fn: () => Promise<unknown>, message: string) {
     try {

@@ -297,13 +297,20 @@ function groupedWatchedActivities(activities: WatchedActivity[], limit: number):
   return Array.from(groups.entries())
     .map(([slot, entries]) => ({
       slot,
-      newest: Math.max(...entries.map((entry) => activityTimeMs(entry.item))),
+      slotTime: slotTimeMs(slot),
       items: entries
         .sort((left, right) => activityTimeMs(right.item) - activityTimeMs(left.item) || right.order - left.order)
         .map((entry) => entry.item),
     }))
-    .sort((left, right) => right.newest - left.newest)
+    .sort((left, right) => right.slotTime - left.slotTime)
     .map(({ slot, items }) => ({ slot, items }));
+}
+
+function slotTimeMs(slot: string): number {
+  const match = /^(\d{2}):(\d{2}):(\d{2})$/.exec(slot);
+  if (!match) return 0;
+  const [, hours, minutes, seconds] = match;
+  return ((Number(hours) * 60 + Number(minutes)) * 60 + Number(seconds)) * 1000;
 }
 
 function activityHighlightClass(decode: Decode): string {

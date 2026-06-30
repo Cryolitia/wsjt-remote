@@ -80,20 +80,20 @@ def on_decode_batch(ctx, decodes):
 
     if not candidates:
         logger.info(
-            "wwa auto reply no candidate total=%d wwa_received=%s skipped_not_listed=%d skipped_worked=%d skipped_blacklisted=%d skipped_not_cq=%d",
+            "wwa auto reply no candidate total=%d wwa_received=%s skipped_not_listed=%d skipped_worked=%d skipped_blacklisted=%d skipped_not_repliable=%d",
             len(decodes),
             wwa_received,
             skipped["not_listed"],
             skipped["worked"],
             skipped["blacklisted"],
-            skipped["not_cq"],
+            skipped["not_repliable"],
         )
         return None
 
     snr, key, decode = max(candidates, key=lambda item: item[0])
     _set_pending_reply(key)
     logger.info(
-        "wwa auto reply selected call=%s day=%s band=%s snr=%s decode_index=%s candidates=%s wwa_received=%s skipped_not_listed=%d skipped_worked=%d skipped_blacklisted=%d skipped_not_cq=%d",
+        "wwa auto reply selected call=%s day=%s band=%s snr=%s decode_index=%s candidates=%s wwa_received=%s skipped_not_listed=%d skipped_worked=%d skipped_blacklisted=%d skipped_not_repliable=%d",
         key[2],
         key[0].isoformat(),
         key[1],
@@ -104,7 +104,7 @@ def on_decode_batch(ctx, decodes):
         skipped["not_listed"],
         skipped["worked"],
         skipped["blacklisted"],
-        skipped["not_cq"],
+        skipped["not_repliable"],
     )
     return decode
 
@@ -290,7 +290,7 @@ def _wwa_candidates(ctx, decodes, now):
         "not_listed": 0,
         "worked": 0,
         "blacklisted": 0,
-        "not_cq": 0,
+        "not_repliable": 0,
     }
     for decode in decodes:
         call = _decode_call(ctx, decode)
@@ -301,7 +301,7 @@ def _wwa_candidates(ctx, decodes, now):
 
         worked = key in worked_keys
         blacklisted = _blacklisted(key, now)
-        cq = ctx.is_cq(str(decode.get("message") or ""))
+        repliable = ctx.is_repliable(str(decode.get("message") or ""))
         snr = int(decode.get("snr") or -999)
         received.append(
             {
@@ -313,7 +313,7 @@ def _wwa_candidates(ctx, decodes, now):
                 "worked": worked,
                 "blacklisted": blacklisted,
                 "blacklisted_until": blacklisted_until[key].isoformat() if blacklisted else "",
-                "cq": cq,
+                "repliable": repliable,
             }
         )
 
@@ -324,9 +324,9 @@ def _wwa_candidates(ctx, decodes, now):
         if blacklisted:
             skipped["blacklisted"] += 1
             continue
-        if not cq:
-            skipped["not_cq"] += 1
-            logger.debug("wwa auto reply candidate skipped non-cq call=%s day=%s band=%s message=%r", key[2], key[0].isoformat(), key[1], decode.get("message"))
+        if not repliable:
+            skipped["not_repliable"] += 1
+            logger.debug("wwa auto reply candidate skipped non-repliable call=%s day=%s band=%s message=%r", key[2], key[0].isoformat(), key[1], decode.get("message"))
             continue
         candidates.append((snr, key, decode))
     return candidates, skipped, received

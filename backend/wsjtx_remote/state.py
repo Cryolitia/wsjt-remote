@@ -197,6 +197,10 @@ def is_calling_own(message: str, own_call: str) -> bool:
     return bool(own and words and words[0] == own)
 
 
+def is_repliable(message: str) -> bool:
+    return any(word in {"CQ", "73", "RRR", "RR73"} for word in message.upper().split())
+
+
 def extract_decode_grid(message: str) -> str:
     for word in message.upper().split():
         if is_grid(word):

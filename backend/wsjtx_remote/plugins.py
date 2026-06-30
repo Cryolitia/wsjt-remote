@@ -13,7 +13,7 @@ from typing import Any
 from . import protocol
 from .adif_index import band_from_adif_freq, band_from_hz, dxcc_key, normalize_grid
 from .dxcc import normalize_call
-from .state import AppState, extract_decode_callsign, extract_decode_grid, is_call, is_calling_own, is_grid
+from .state import AppState, extract_decode_callsign, extract_decode_grid, is_call, is_calling_own, is_grid, is_repliable
 
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,9 @@ class PluginContext:
 
     def is_cq(self, message: str) -> bool:
         return any(word == "CQ" for word in message.upper().split())
+
+    def is_repliable(self, message: str) -> bool:
+        return is_repliable(message)
 
     def is_calling_own(self, message: str) -> bool:
         return is_calling_own(message, str(self._state.status.get("de_call") or ""))

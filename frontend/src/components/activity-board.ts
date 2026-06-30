@@ -357,8 +357,15 @@ function activityHighlightClass(decode: Decode): string {
 
 function shouldHighlightFullRow(decode: Decode): boolean {
   if (decode.id === "local") return true;
-  const words = decode.message.toUpperCase().split(/\s+/).filter(Boolean);
-  return words.some((word) => word === "CQ" || word === "73" || word === "RRR" || word === "RR73");
+  return isRepliable(decode.message);
+}
+
+function isRepliable(message: string): boolean {
+  return message
+    .toUpperCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .some((word) => word === "CQ" || word === "73" || word === "RRR" || word === "RR73");
 }
 
 function pluginColorStyle(decode: Decode): string {

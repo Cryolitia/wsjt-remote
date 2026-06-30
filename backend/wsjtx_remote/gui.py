@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
+import time
 from typing import Any
 
 
@@ -10,6 +11,20 @@ logger = logging.getLogger(__name__)
 
 
 def send_alt_n_to_wsjtx() -> None:
+    _focus_wsjtx_window()
+    _run(["wtype", "-M", "alt", "n", "-m", "alt"], "wtype failed")
+    logger.info("sent Alt+N to WSJT/JTDX")
+
+
+def trigger_cq_to_wsjtx() -> None:
+    _focus_wsjtx_window()
+    _run(["wtype", "-k", "F4"], "wtype F4 failed")
+    time.sleep(0.15)
+    _run(["wtype", "-M", "alt", "n", "-m", "alt"], "wtype Alt+N failed")
+    logger.info("sent F4 then Alt+N to WSJT/JTDX")
+
+
+def _focus_wsjtx_window() -> None:
     logger.info("querying niri windows for WSJT/JTDX")
     windows = _niri_windows()
     window = _select_wsjtx_window(windows)
@@ -24,8 +39,6 @@ def send_alt_n_to_wsjtx() -> None:
 
     logger.info("focusing WSJT/JTDX window id=%s title=%r app_id=%r", window_id, window.get("title", ""), window.get("app_id", ""))
     _run(["niri", "msg", "action", "focus-window", "--id", str(window_id)], "niri focus-window failed")
-    _run(["wtype", "-M", "alt", "n", "-m", "alt"], "wtype failed")
-    logger.info("sent Alt+N to WSJT/JTDX")
 
 
 def _niri_windows() -> list[dict[str, Any]]:

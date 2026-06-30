@@ -9,7 +9,7 @@ from typing import Any, Awaitable, Callable
 from aiohttp import web, WSCloseCode, WSMsgType
 
 from . import protocol
-from .gui import send_alt_n_to_wsjtx
+from .gui import send_alt_n_to_wsjtx, trigger_cq_to_wsjtx
 from .state import AppState
 from .udp import send_datagram
 
@@ -147,14 +147,13 @@ async def _send(request: web.Request, data: bytes) -> web.Response:
 
 
 async def api_cq(request: web.Request) -> web.Response:
-    state: AppState = request.app["state"]
-    call = str(state.status.get("de_call") or "").strip()
-    grid = str(state.status.get("de_grid") or "").strip()[:4]
-    if not call or not grid:
-        logger.warning("cq rejected: missing de_call/de_grid")
-        return json_response({"error": "DE call/grid is not available from WSJT-X status"}, status=400)
-    logger.info("api cq text=%r", f"CQ {call} {grid}")
-    return await _send(request, protocol.build_free_text(state.remote.id, f"CQ {call} {grid}", True, state.remote.schema))
+    logger.info("api cq requested")
+    try:
+        trigger_cq_to_wsjtx()
+    except RuntimeError as exc:
+        logger.warning("api cq failed: %s", exc)
+        return json_response({"error": str(exc)}, status=500)
+    return json_response({"ok": True})
 
 
 async def api_free_text(request: web.Request) -> web.Response:

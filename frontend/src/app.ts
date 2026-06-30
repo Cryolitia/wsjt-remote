@@ -192,16 +192,7 @@ class WSJTXApp extends LitElement {
   }
 
   private async cq() {
-    const call = String(this.snapshot.status.de_call || "").trim();
-    const grid = String(this.snapshot.status.de_grid || "").trim().slice(0, 4);
-    const idle = !this.snapshot.status.tx_enabled && !this.snapshot.status.transmitting;
-    const message = idle
-      ? "CQ set to Tx5; Enable Tx triggered"
-      : "CQ set to Tx5; Enable Tx already active";
-    await this.action(async () => {
-      await postJson("/api/cq");
-      if (idle) await postJson("/api/alt-n");
-    }, message);
+    await this.action(() => postJson("/api/cq"), "CQ triggered with F4; Alt+N sent");
   }
   private async halt() { await this.action(() => postJson("/api/halt-tx", { auto_tx_only: false }), "Halt sent"); }
   private async clear() {

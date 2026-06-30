@@ -76,9 +76,9 @@ export class ActivityBoard extends LitElement {
       }
       rows.push(html`
         <tr class=${fullRowHighlight ? highlightClass : ""} @dblclick=${() => this.watch(decode)}>
-          <td><small><strong>${decode.snr}</strong></small></td>
+          <td><small><strong>${formatSnr(decode.snr)}</strong></small></td>
           <td><small>${formatDt(decode.delta_time)}</small></td>
-          <td><small>${decode.delta_frequency}</small></td>
+          <td><small>${formatDf(decode.delta_frequency)}</small></td>
           <td><small class=${activityMessageClass(decode, this.status.de_call)}>${decode.message}</small></td>
           <td class=${fullRowHighlight ? "" : highlightClass}><small>${formatDxcc(decode)}</small></td>
           <td><small><a href="#" @click=${(event: Event) => this.replyAndWatchFromLink(event, decode)}>Reply</a></small></td>
@@ -97,9 +97,9 @@ export class ActivityBoard extends LitElement {
         const fullRowHighlight = shouldHighlightFullRow(item);
         rows.push(html`
           <tr class=${fullRowHighlight ? highlightClass : ""}>
-            <td><small>${item.snr}</small></td>
+            <td><small>${formatSnr(item.snr)}</small></td>
             <td><small>${formatDt(item.delta_time)}</small></td>
-            <td><small>${item.delta_frequency}</small></td>
+            <td><small>${formatDf(item.delta_frequency)}</small></td>
             <td><small class=${activityMessageClass(item, this.status.de_call)}>${item.message}</small></td>
             <td class=${fullRowHighlight ? "" : highlightClass}><small>${formatDxcc(item)}</small></td>
             <td>
@@ -149,9 +149,6 @@ export class ActivityBoard extends LitElement {
       received_at: now,
       new: true,
       time: now.slice(11, 23),
-      snr: 0,
-      delta_time: 0,
-      delta_frequency: 0,
       mode: String(this.status.mode || ""),
       message,
       low_confidence: false,
@@ -284,8 +281,17 @@ function timeSlot(time: string): string {
   return time.split(".")[0] || "unknown";
 }
 
-function formatDt(value: number): string {
+function formatSnr(value?: number): string {
+  return value === undefined ? "" : String(value);
+}
+
+function formatDt(value?: number): string {
+  if (value === undefined) return "";
   return value.toFixed(1);
+}
+
+function formatDf(value?: number): string {
+  return value === undefined ? "" : String(value);
 }
 
 function formatDxcc(decode: Decode): string {

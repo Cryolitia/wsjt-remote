@@ -34,9 +34,9 @@ export type Decode = {
   received_at: string;
   new: boolean;
   time: string;
-  snr: number;
-  delta_time: number;
-  delta_frequency: number;
+  snr?: number;
+  delta_time?: number;
+  delta_frequency?: number;
   mode: string;
   message: string;
   dxcc_call?: string;

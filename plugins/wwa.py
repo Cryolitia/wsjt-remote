@@ -60,36 +60,29 @@ def on_decode_batch(ctx, decodes):
         )
         return None
 
-    candidates = []
     now = _now_utc(ctx)
-    skipped = {
-        "not_listed": 0,
-        "worked": 0,
-        "blacklisted": 0,
-        "not_cq": 0,
-    }
-    for decode in decodes:
-        call = _decode_call(ctx, decode)
-        key = _selection_key(ctx, decode, call)
-        if not key:
-            skipped["not_listed"] += 1
-            continue
-        if key in worked_keys:
-            skipped["worked"] += 1
-            logger.debug("wwa auto reply candidate skipped worked call=%s day=%s band=%s", key[2], key[0].isoformat(), key[1])
-            continue
-        if _blacklisted(key, now):
-            skipped["blacklisted"] += 1
-            continue
-        if not ctx.is_cq(str(decode.get("message") or "")):
-            skipped["not_cq"] += 1
-            logger.debug("wwa auto reply candidate skipped non-cq call=%s day=%s band=%s message=%r", key[2], key[0].isoformat(), key[1], decode.get("message"))
-            continue
-        candidates.append((int(decode.get("snr") or -999), key, decode))
+    candidates, skipped, wwa_received = _wwa_candidates(ctx, decodes, now)
+
+    direct_candidates = _direct_call_candidates(ctx, decodes)
+    if direct_candidates:
+        snr, key, decode = max(direct_candidates, key=lambda item: item[0])
+        logger.info(
+            "wwa auto reply selected direct call=%s day=%s band=%s snr=%s decode_index=%s candidates=%s wwa_received=%s no_pending=true",
+            key[2],
+            key[0].isoformat(),
+            key[1],
+            snr,
+            decode.get("index"),
+            [(item_key[2], item_snr, item_decode.get("index")) for item_snr, item_key, item_decode in sorted(direct_candidates, reverse=True)],
+            wwa_received,
+        )
+        return decode
+
     if not candidates:
         logger.info(
-            "wwa auto reply no candidate total=%d skipped_not_listed=%d skipped_worked=%d skipped_blacklisted=%d skipped_not_cq=%d",
+            "wwa auto reply no candidate total=%d wwa_received=%s skipped_not_listed=%d skipped_worked=%d skipped_blacklisted=%d skipped_not_cq=%d",
             len(decodes),
+            wwa_received,
             skipped["not_listed"],
             skipped["worked"],
             skipped["blacklisted"],
@@ -100,13 +93,14 @@ def on_decode_batch(ctx, decodes):
     snr, key, decode = max(candidates, key=lambda item: item[0])
     _set_pending_reply(key)
     logger.info(
-        "wwa auto reply selected call=%s day=%s band=%s snr=%s decode_index=%s candidates=%s skipped_not_listed=%d skipped_worked=%d skipped_blacklisted=%d skipped_not_cq=%d",
+        "wwa auto reply selected call=%s day=%s band=%s snr=%s decode_index=%s candidates=%s wwa_received=%s skipped_not_listed=%d skipped_worked=%d skipped_blacklisted=%d skipped_not_cq=%d",
         key[2],
         key[0].isoformat(),
         key[1],
         snr,
         decode.get("index"),
         [(item_key[2], item_snr, item_decode.get("index")) for item_snr, item_key, item_decode in sorted(candidates, reverse=True)],
+        wwa_received,
         skipped["not_listed"],
         skipped["worked"],
         skipped["blacklisted"],
@@ -140,34 +134,45 @@ def on_status(ctx, status):
 def on_logged_adif(ctx, raw_adif, indexed_count):
     global pending_reply_key, pending_reply_seen_active
 
+    logger.info("wwa LoggedADIF received indexed_count=%d", indexed_count)
     if not indexed_count:
         return
     fallback_day = _utc_date(ctx.now())
     changed = False
+    records = 0
     for record in parse_adif_records(raw_adif):
-        if str(record.get("MODE") or "").strip().upper() != "FT8":
+        records += 1
+        mode = str(record.get("MODE") or "").strip().upper()
+        if mode != "FT8":
+            logger.info("wwa LoggedADIF skipped call=%s mode=%s reason=mode", record.get("CALL", ""), mode)
             continue
         call = ctx.normalize_call(str(record.get("CALL") or ""))
-        if call not in stations:
-            continue
         band = ctx.band_from_adif_freq(str(record.get("FREQ") or ""))
         if not band:
+            logger.info("wwa LoggedADIF skipped call=%s reason=band freq=%r", call, record.get("FREQ", ""))
             continue
         day = _adif_date(record.get("QSO_DATE")) or fallback_day
         if day is None:
+            logger.info("wwa LoggedADIF skipped call=%s band=%s reason=date qso_date=%r", call, band, record.get("QSO_DATE", ""))
             continue
         key = (day, band, call)
-        if key not in worked_keys:
-            worked_keys.add(key)
-            changed = True
-            logger.info("wwa logged worked call=%s day=%s band=%s", call, day.isoformat(), band)
         if key == pending_reply_key:
             pending_reply_key = None
             pending_reply_seen_active = False
             blacklisted_until.pop(key, None)
             logger.info("wwa pending reply confirmed by LoggedADIF call=%s day=%s band=%s", call, day.isoformat(), band)
+        if call not in stations:
+            logger.info("wwa LoggedADIF not a listed WWA station call=%s day=%s band=%s", call, day.isoformat(), band)
+            continue
+        if key not in worked_keys:
+            worked_keys.add(key)
+            changed = True
+            logger.info("wwa logged worked call=%s day=%s band=%s", call, day.isoformat(), band)
+        else:
+            logger.info("wwa LoggedADIF already cached call=%s day=%s band=%s", call, day.isoformat(), band)
     if changed:
         _save_worked()
+    logger.info("wwa LoggedADIF processed records=%d changed=%s worked_keys=%d", records, changed, len(worked_keys))
 
 
 def _load_stations(ctx):
@@ -234,6 +239,13 @@ def _decode_call(ctx, decode):
     return value if value in stations else ""
 
 
+def _decode_any_call(ctx, decode):
+    call = ctx.extract_callsign(str(decode.get("message") or ""))
+    if not call or call == "UNKNOWN":
+        return ""
+    return ctx.normalize_call(call)
+
+
 def _selection_key(ctx, decode, call):
     if not call:
         return None
@@ -244,6 +256,80 @@ def _selection_key(ctx, decode, call):
     if day is None:
         return None
     return day, band, call
+
+
+def _direct_call_candidates(ctx, decodes):
+    candidates = []
+    skipped_not_calling_me = 0
+    skipped_no_key = 0
+    for decode in decodes:
+        message = str(decode.get("message") or "")
+        if not ctx.is_calling_own(message):
+            skipped_not_calling_me += 1
+            continue
+        call = _decode_any_call(ctx, decode)
+        key = _selection_key(ctx, decode, call)
+        if not key:
+            skipped_no_key += 1
+            continue
+        candidates.append((int(decode.get("snr") or -999), key, decode))
+    if candidates:
+        logger.info(
+            "wwa direct-call candidates=%s skipped_not_calling_me=%d skipped_no_key=%d",
+            [(key[2], snr, decode.get("index")) for snr, key, decode in sorted(candidates, reverse=True)],
+            skipped_not_calling_me,
+            skipped_no_key,
+        )
+    return candidates
+
+
+def _wwa_candidates(ctx, decodes, now):
+    candidates = []
+    received = []
+    skipped = {
+        "not_listed": 0,
+        "worked": 0,
+        "blacklisted": 0,
+        "not_cq": 0,
+    }
+    for decode in decodes:
+        call = _decode_call(ctx, decode)
+        key = _selection_key(ctx, decode, call)
+        if not key:
+            skipped["not_listed"] += 1
+            continue
+
+        worked = key in worked_keys
+        blacklisted = _blacklisted(key, now)
+        cq = ctx.is_cq(str(decode.get("message") or ""))
+        snr = int(decode.get("snr") or -999)
+        received.append(
+            {
+                "call": key[2],
+                "day": key[0].isoformat(),
+                "band": key[1],
+                "snr": snr,
+                "index": decode.get("index"),
+                "worked": worked,
+                "blacklisted": blacklisted,
+                "blacklisted_until": blacklisted_until[key].isoformat() if blacklisted else "",
+                "cq": cq,
+            }
+        )
+
+        if worked:
+            skipped["worked"] += 1
+            logger.debug("wwa auto reply candidate skipped worked call=%s day=%s band=%s", key[2], key[0].isoformat(), key[1])
+            continue
+        if blacklisted:
+            skipped["blacklisted"] += 1
+            continue
+        if not cq:
+            skipped["not_cq"] += 1
+            logger.debug("wwa auto reply candidate skipped non-cq call=%s day=%s band=%s message=%r", key[2], key[0].isoformat(), key[1], decode.get("message"))
+            continue
+        candidates.append((snr, key, decode))
+    return candidates, skipped, received
 
 
 def _set_pending_reply(key):

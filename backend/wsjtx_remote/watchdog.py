@@ -6,7 +6,7 @@ import time
 from typing import Any
 
 from . import protocol
-from .state import is_calling_own
+from .state import extract_decode_callsign, is_calling_own
 
 
 logger = logging.getLogger(__name__)
@@ -43,9 +43,15 @@ class ReplyWatchdog:
     def on_status(self, status: dict[str, Any]) -> None:
         if _tx_idle(status):
             self.disarm("tx_idle")
+        elif not self.armed:
+            self.arm("non_idle")
 
     def on_decode(self, decode: dict[str, Any]) -> None:
-        if is_calling_own(str(decode.get("message") or ""), str(self.state.status.get("de_call") or "")):
+        message = str(decode.get("message") or "")
+        own_call = str(self.state.status.get("de_call") or "")
+        caller = extract_decode_callsign(message, own_call)
+        dx_call = str(self.state.status.get("dx_call") or "").upper().strip()
+        if is_calling_own(message, own_call) and caller and caller == dx_call:
             self.reset_if_armed("calling_own")
 
     async def run(self) -> None:

@@ -260,9 +260,8 @@ function extractCallsign(message: string, ownCall: string): string {
   if (words[0] === "CQ") {
     return words.find((word, index) => index > 0 && isCall(word) && word !== own) || "";
   }
-  const calls = words.filter(isCall);
-  if (calls.length >= 2) return calls[1] !== own ? calls[1] : "";
-  return calls.find((word) => word !== own) || "";
+  if (words.length >= 2) return isCall(words[1]) && words[1] !== own ? words[1] : "";
+  return "";
 }
 
 function extractGrid(message: string): string | undefined {
@@ -270,11 +269,11 @@ function extractGrid(message: string): string | undefined {
 }
 
 function isCall(word: string): boolean {
-  return !isGrid(word) && /^[A-Z0-9/]{3,12}$/.test(word) && /\d/.test(word) && /[A-Z]/.test(word);
+  return word !== "RR73" && word !== "RRR" && !isGrid(word) && /^[A-Z0-9/]{3,12}$/.test(word) && /\d/.test(word) && /[A-Z]/.test(word);
 }
 
 function isGrid(word: string): boolean {
-  return /^[A-R]{2}\d{2}([A-X]{2})?$/.test(word);
+  return word !== "RR73" && /^[A-R]{2}\d{2}([A-X]{2})?$/.test(word);
 }
 
 function timeSlot(time: string): string {
@@ -295,6 +294,7 @@ function formatDf(value?: number): string {
 }
 
 function formatDxcc(decode: Decode): string {
+  if (decode.dxcc_call === "UNKNOWN") return "Unknown";
   return decode.dxcc_label || decode.dxcc_entity || "-";
 }
 

@@ -102,25 +102,26 @@ class AppState:
         call = extract_decode_callsign(str(item.get("message") or ""), str(self.status.get("de_call") or ""))
         if call:
             item["dxcc_call"] = call
-        match = self.dxcc.lookup(call) if call else None
+        lookup_call = "" if call == "UNKNOWN" else call
+        match = self.dxcc.lookup(lookup_call) if lookup_call else None
         if match:
             item["dxcc_prefix"] = match.prefix
             item["dxcc_entity"] = match.entity
             item["dxcc_label"] = match.label
         grid = extract_decode_grid(str(item.get("message") or ""))
-        if call and grid:
-            self.call_grids[call] = grid
-        lookup_grid = grid or self.call_grids.get(call, "")
+        if lookup_call and grid:
+            self.call_grids[lookup_call] = grid
+        lookup_grid = grid or self.call_grids.get(lookup_call, "")
         if lookup_grid:
             item["worked_grid4"] = lookup_grid
         if self.adif.has_data:
             current_band = band_from_hz(self.status.get("dial_frequency"))
-            worked = worked_status_json(self.adif.lookup(call=call, grid=lookup_grid, dxcc=match, frequency_hz=self.status.get("dial_frequency")))
+            worked = worked_status_json(self.adif.lookup(call=lookup_call, grid=lookup_grid, dxcc=match, frequency_hz=self.status.get("dial_frequency")))
             if not current_band:
                 worked.pop("worked_call_band", None)
                 worked.pop("worked_grid_band", None)
                 worked.pop("worked_dxcc_band", None)
-            if not call:
+            if not lookup_call:
                 worked.pop("worked_call", None)
                 worked.pop("worked_call_band", None)
             if not lookup_grid or not self.adif.has_grid_data:
@@ -177,10 +178,11 @@ def extract_decode_callsign(message: str, own_call: str) -> str:
             if index > 0 and is_call(word) and word != own:
                 return word
         return ""
-    calls = [word for word in words if is_call(word)]
-    if len(calls) >= 2:
-        return calls[1] if calls[1] != own else ""
-    return next((word for word in calls if word != own), "")
+    if len(words) >= 2:
+        if is_hashed_call(words[1]):
+            return "UNKNOWN"
+        return words[1] if is_call(words[1]) and words[1] != own else ""
+    return ""
 
 
 def extract_decode_grid(message: str) -> str:
@@ -191,8 +193,12 @@ def extract_decode_grid(message: str) -> str:
 
 
 def is_call(word: str) -> bool:
-    return not is_grid(word) and bool(re.match(r"^[A-Z0-9/]{3,12}$", word)) and any(ch.isdigit() for ch in word) and any(ch.isalpha() for ch in word)
+    return word not in {"RR73", "RRR"} and not is_grid(word) and bool(re.match(r"^[A-Z0-9/]{3,12}$", word)) and any(ch.isdigit() for ch in word) and any(ch.isalpha() for ch in word)
+
+
+def is_hashed_call(word: str) -> bool:
+    return bool(re.match(r"^<[^>]+>$", word))
 
 
 def is_grid(word: str) -> bool:
-    return bool(GRID_RE.match(word))
+    return word != "RR73" and bool(GRID_RE.match(word))

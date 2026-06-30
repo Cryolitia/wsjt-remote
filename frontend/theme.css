@@ -35,6 +35,8 @@
   --app-warning: var(--nord13);
   --app-danger: var(--nord11);
   --app-special: var(--nord15);
+  --plugin-color-nord8: var(--nord8);
+  --plugin-color-nord8-soft: color-mix(in srgb, var(--nord8) 54%, var(--app-surface));
   --app-shadow: color-mix(in srgb, var(--nord0) 12%, transparent);
   --app-focus: color-mix(in srgb, var(--app-accent) 35%, transparent);
 
@@ -638,6 +640,12 @@ tbody tr:is(:hover, :focus-within) td {
 
 .activity-row--band-call {
   --activity-row-bg: color-mix(in srgb, var(--nord13) 38%, var(--app-surface));
+  --activity-row-fg: var(--nord0);
+  --activity-row-link: var(--nord0);
+}
+
+.activity-row--plugin {
+  --activity-row-bg: var(--nord15);
   --activity-row-fg: var(--nord0);
   --activity-row-link: var(--nord0);
 }

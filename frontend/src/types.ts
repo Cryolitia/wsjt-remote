@@ -43,6 +43,8 @@ export type Decode = {
   dxcc_prefix?: string;
   dxcc_entity?: string;
   dxcc_label?: string;
+  plugin_color?: string;
+  plugin_note?: string;
   worked_call?: boolean;
   worked_call_band?: boolean;
   worked_grid?: boolean;

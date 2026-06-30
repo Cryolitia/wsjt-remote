@@ -70,17 +70,18 @@ export class ActivityBoard extends LitElement {
       const slot = timeSlot(decode.time);
       const highlightClass = activityHighlightClass(decode);
       const fullRowHighlight = shouldHighlightFullRow(decode);
+      const style = pluginColorStyle(decode);
       if (slot !== lastSlot) {
         rows.push(html`<tr><th colspan="6"><small><strong>${slot}</strong></small></th></tr>`);
         lastSlot = slot;
       }
       rows.push(html`
-        <tr class=${fullRowHighlight ? highlightClass : ""} @dblclick=${() => this.watch(decode)}>
+        <tr class=${fullRowHighlight ? highlightClass : ""} style=${fullRowHighlight ? style : ""} @dblclick=${() => this.watch(decode)}>
           <td><small><strong>${formatSnr(decode.snr)}</strong></small></td>
           <td><small>${formatDt(decode.delta_time)}</small></td>
           <td><small>${formatDf(decode.delta_frequency)}</small></td>
           <td><small class=${activityMessageClass(decode, this.status.de_call)}>${decode.message}</small></td>
-          <td class=${fullRowHighlight ? "" : highlightClass}><small>${formatDxcc(decode)}</small></td>
+          <td class=${fullRowHighlight ? "" : highlightClass} style=${fullRowHighlight ? "" : style}><small>${formatDxcc(decode)}</small></td>
           <td><small><a href="#" @click=${(event: Event) => this.replyAndWatchFromLink(event, decode)}>Reply</a></small></td>
         </tr>
       `);
@@ -95,13 +96,14 @@ export class ActivityBoard extends LitElement {
       for (const item of group.items) {
         const highlightClass = activityHighlightClass(item);
         const fullRowHighlight = shouldHighlightFullRow(item);
+        const style = pluginColorStyle(item);
         rows.push(html`
-          <tr class=${fullRowHighlight ? highlightClass : ""}>
+          <tr class=${fullRowHighlight ? highlightClass : ""} style=${fullRowHighlight ? style : ""}>
             <td><small>${formatSnr(item.snr)}</small></td>
             <td><small>${formatDt(item.delta_time)}</small></td>
             <td><small>${formatDf(item.delta_frequency)}</small></td>
             <td><small class=${activityMessageClass(item, this.status.de_call)}>${item.message}</small></td>
-            <td class=${fullRowHighlight ? "" : highlightClass}><small>${formatDxcc(item)}</small></td>
+            <td class=${fullRowHighlight ? "" : highlightClass} style=${fullRowHighlight ? "" : style}><small>${formatDxcc(item)}</small></td>
             <td>
               <small>
                 ${item.index >= 0 && item.id !== "local" ? html`<a href="#" @click=${(event: Event) => this.replyFromLink(event, item.index)}>Reply</a> · ` : null}
@@ -342,6 +344,7 @@ function slotTimeMs(slot: string): number {
 
 function activityHighlightClass(decode: Decode): string {
   if (decode.id === "local") return "activity-row--tx";
+  if (pluginColorValue(decode)) return "activity-row--plugin";
   if (decode.worked_call_band) return "";
   if (decode.worked_call === true && decode.worked_call_band === false) return "activity-row--band-call";
   if (decode.dxcc_entity && decode.worked_dxcc === false) return "activity-row--new-dxcc";
@@ -356,6 +359,20 @@ function shouldHighlightFullRow(decode: Decode): boolean {
   if (decode.id === "local") return true;
   const words = decode.message.toUpperCase().split(/\s+/).filter(Boolean);
   return words.some((word) => word === "CQ" || word === "73" || word === "RRR" || word === "RR73");
+}
+
+function pluginColorStyle(decode: Decode): string {
+  const color = pluginColorValue(decode);
+  return color ? `--activity-row-bg: ${color}; --activity-row-fg: var(--nord0); --activity-row-link: var(--nord0);` : "";
+}
+
+function pluginColorValue(decode: Decode): string {
+  const value = decode.plugin_color?.trim().toLowerCase() || "";
+  if (value === "nord8") return "var(--plugin-color-nord8)";
+  if (value === "nord8-soft") return "var(--plugin-color-nord8-soft)";
+  if (/^nord([0-9]|1[0-5])$/.test(value)) return `var(--${value})`;
+  if (/^#[0-9a-f]{6}$/.test(value)) return value;
+  return "";
 }
 
 function activityMessageClass(decode: Decode, ownCall?: string): string {

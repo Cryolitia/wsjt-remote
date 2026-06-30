@@ -9,6 +9,7 @@ import signal
 
 from aiohttp import web
 
+from .plugins import PluginManager
 from .state import AppState
 from .udp import heartbeat_loop, start_udp
 from .web import create_app
@@ -31,8 +32,14 @@ async def run(args: argparse.Namespace) -> None:
         state.dxcc.load()
         state.adif.load_file(Path(args.adif).expanduser().resolve())
     state.dxcc.start_background_refresh()
+    if args.plugin_dir:
+        state.plugins = PluginManager(state, decode_grace=args.plugin_decode_grace)
+        state.plugins.load_dir(Path(args.plugin_dir).expanduser().resolve())
+        state.plugins.on_start()
     app = await create_app(state, Path(args.static_dir).resolve())
     broadcaster = app["broadcast"]
+    if state.plugins:
+        state.plugins.broadcaster = broadcaster
     transport = await start_udp(state, broadcaster, args.udp_host, args.udp_port)
     heartbeat_task = asyncio.create_task(heartbeat_loop(state, broadcaster), name="wsjt-remote-heartbeat")
 
@@ -52,6 +59,8 @@ async def run(args: argparse.Namespace) -> None:
         await stop_event.wait()
     finally:
         logger.info("shutting down")
+        if state.plugins:
+            state.plugins.on_stop()
         heartbeat_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await heartbeat_task
@@ -68,6 +77,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--web-port", type=int, default=8080)
     parser.add_argument("--static-dir", default=str(default_static_dir()))
     parser.add_argument("--adif", default="", help="Path to a read-only ADIF log used for worked-before lookups")
+    parser.add_argument("--plugin-dir", default="", help="Directory containing Python plugins")
+    parser.add_argument("--plugin-decode-grace", type=float, default=1.0, help="Seconds to wait after the last decode in a slot before plugin batch processing")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return parser
 

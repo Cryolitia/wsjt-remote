@@ -100,6 +100,14 @@ Load a read-only ADIF log for worked-before lookup:
 nix run .#wsjt-remote -- --adif ./wsjtx_log.adi
 ```
 
+Load Python plugins:
+
+```bash
+nix run .#wsjt-remote -- --plugin-dir ./plugins
+```
+
+`--plugin-decode-grace` controls how long the backend waits after the last decode in the same WSJT/JTDX time slot before calling plugin batch logic. The default is `1.0` second.
+
 Logs are written to stderr. Use `--log-level` to change verbosity:
 
 ```bash
@@ -153,7 +161,88 @@ The value is stored in browser `localStorage`.
 
 ## CQ And Enable Tx
 
-The `CQ` button first sends WSJT-X a UDP `FreeText` command for `CQ {DE call} {grid4}`. If WSJT-X is idle, it then uses Niri IPC to find a window whose title/app-id contains `WSJT` or `JTDX`, focuses it, and sends `Alt+N` with `wtype`.
+The `CQ` button uses Niri IPC to focus the WSJT-X/JTDX main window and sends keyboard shortcuts with `wtype`. If the current DX call/grid is populated, it sends `F4` before `Alt+N`; otherwise it sends only `Alt+N`.
+
+## Plugins
+
+Pass `--plugin-dir` to load Python files from a local plugin directory. Files are loaded in filename order, and files starting with `_` are ignored. Plugins run with the same permissions as the backend; this is not a sandbox.
+
+Plugins may define any of these functions:
+
+```python
+def on_start(ctx):
+    pass
+
+def on_status(ctx, status):
+    pass
+
+def on_decode(ctx, decode):
+    pass
+
+def on_logged_adif(ctx, raw_adif, indexed_count):
+    pass
+
+def on_decode_batch(ctx, decodes):
+    return None
+
+def on_stop(ctx):
+    pass
+```
+
+`on_decode` runs after the backend has calculated DXCC and worked-before fields. Plugins can change display-only fields such as:
+
+```python
+decode["dxcc_label"] = "Priority"
+decode["plugin_color"] = "nord14"
+decode["plugin_note"] = "local rule matched"
+```
+
+Worked-before fields are restored after `on_decode`, so plugins cannot affect ADIF worked calculations.
+
+`on_decode_batch` runs after a WSJT/JTDX decode time slot appears complete. The backend groups decodes by `decode["time"]` and waits `--plugin-decode-grace` seconds after the last decode in that slot. Return `None`, a decode dict, or a decode index. The first plugin returning a valid decode triggers one Reply for that batch.
+
+The plugin context exposes helpers and read-only worked sets:
+
+```python
+ctx.status
+ctx.remote
+ctx.adif.worked_calls
+ctx.adif.worked_calls_by_band
+ctx.adif.worked_grids
+ctx.adif.worked_grids_by_band
+ctx.adif.worked_dxcc
+ctx.adif.worked_dxcc_by_band
+ctx.extract_callsign(message)
+ctx.extract_grid(message)
+ctx.is_cq(message)
+ctx.is_calling_own(message)
+ctx.current_band()
+ctx.worked_call(call, band=None)
+ctx.worked_grid(grid, band=None)
+ctx.worked_dxcc(call_or_key, band=None)
+ctx.reply(decode, modifiers=0)
+```
+
+Example:
+
+```python
+def on_decode(ctx, decode):
+    if ctx.is_cq(decode["message"]):
+        decode["plugin_color"] = "nord14"
+
+def on_decode_batch(ctx, decodes):
+    for decode in decodes:
+        call = ctx.extract_callsign(decode["message"])
+        if call and ctx.is_cq(decode["message"]) and not ctx.worked_call(call, band=ctx.current_band()):
+            return decode
+    return None
+```
+
+See `plugins/china_province.py` for a test plugin that replaces China DXCC labels with a province label and colors first-worked province rows with Nord blue.
+
+See `plugins/japan_prefecture.py` for a test plugin that replaces Japan DXCC labels with Chinese WAJA prefecture names. It downloads JJ1WTL's offline JA callbook CSV, caches it under `/tmp/wsjt-remote/plugins/japan_prefecture`, and refreshes the cache every 30 days.
+
+See `plugins/wwa.py` for a World Wide Award helper. Place `wwa_stations.txt` next to the plugin, with one callsign per line. Listed stations are highlighted while they have not been worked on the UTC day and band from `decode["received_at"]`. Set `WWA_AUTO_REPLY=1` to let the plugin reply only while TX is Idle; it chooses unworked CQ stations on the current day/band by highest SNR. Worked keys are recorded only from `LoggedADIF`, persisted as JSON in `/tmp/wsjt-remote/plugins/wwa_worked.json`, and pruned to the current UTC day on startup. If an auto-replied station is not logged before TX returns to Idle, that day/band/call key is blacklisted in memory for 30 minutes.
 
 ## Development
 

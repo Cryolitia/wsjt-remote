@@ -59,6 +59,7 @@ class AppState:
     debug_events: deque[dict[str, Any]] = field(default_factory=lambda: deque(maxlen=500))
     websockets: set[Any] = field(default_factory=set)
     udp_transport: Any = None
+    plugins: Any = None
     next_decode_index: int = 1
     dxcc: DxccLookup = field(default_factory=DxccLookup)
     call_grids: dict[str, str] = field(default_factory=dict)

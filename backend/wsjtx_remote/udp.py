@@ -43,9 +43,13 @@ class WSJTXUDPProtocol(asyncio.DatagramProtocol):
             frequency_changed = bool(previous_frequency and next_frequency and previous_frequency != next_frequency)
             if frequency_changed:
                 self.state.clear_activity()
+                if self.state.plugins:
+                    self.state.plugins.cancel_batches()
                 logger.info("dial frequency changed from %s to %s; cleared activity", previous_frequency, next_frequency)
                 await self.broadcaster({"event": "clear", "data": {"reason": "frequency", "dial_frequency": next_frequency}})
             self.state.status = dict(msg.fields)
+            if self.state.plugins:
+                self.state.plugins.on_status(self.state.status)
             logger.info(
                 "status id=%s mode=%s tx_enabled=%s transmitting=%s tx_message=%r",
                 msg.id,
@@ -58,10 +62,14 @@ class WSJTXUDPProtocol(asyncio.DatagramProtocol):
             await self.broadcaster({"event": "state", "data": self.state.snapshot()})
         elif msg.type == protocol.MessageType.Decode:
             decode = self.state.add_decode(msg)
+            if self.state.plugins:
+                self.state.plugins.on_decode(decode)
             logger.info("decode #%s snr=%s df=%s message=%r", decode["index"], decode["snr"], decode["delta_frequency"], decode["message"])
             await self.broadcaster({"event": "decode", "data": decode})
         elif msg.type == protocol.MessageType.Clear:
             self.state.clear_activity()
+            if self.state.plugins:
+                self.state.plugins.cancel_batches()
             logger.info("clear received id=%s fields=%s", msg.id, msg.fields)
             await self.broadcaster({"event": "clear", "data": msg.fields})
         elif msg.type == protocol.MessageType.Close:
@@ -71,6 +79,8 @@ class WSJTXUDPProtocol(asyncio.DatagramProtocol):
             adif = str(msg.fields.get("adif") or "")
             call = extract_adif_call(adif)
             indexed = self.state.adif.add_adif(adif)
+            if self.state.plugins:
+                self.state.plugins.on_logged_adif(adif, indexed)
             logger.info("logged adif call=%s indexed=%s", call or "", indexed)
             await self.broadcaster({"event": "logged_adif", "data": {"adif": adif, "call": call}})
 

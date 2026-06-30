@@ -18,6 +18,7 @@ export class ActivityBoard extends LitElement {
   @state() private message = "";
   @state() private limit = 50;
   private watchedActivityKeys = new Set<string>();
+  private processedDecodeKeys = new Set<string>();
 
   render() {
     return html`
@@ -131,6 +132,9 @@ export class ActivityBoard extends LitElement {
   updated(changed: Map<string, unknown>) {
     if (changed.has("decodes")) {
       for (const decode of this.decodes) {
+        const key = decodeKey(decode);
+        if (this.processedDecodeKeys.has(key)) continue;
+        this.processedDecodeKeys.add(key);
         this.watchIfCallingOwn(decode);
         this.matchWatched(decode);
       }
@@ -291,6 +295,10 @@ function formatDxcc(decode: Decode): string {
 function activityTimeMs(decode: Decode): number {
   const timestamp = Date.parse(decode.received_at);
   return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function decodeKey(decode: Decode): string {
+  return `${decode.index}:${decode.received_at}:${decode.message}`;
 }
 
 function groupedWatchedActivities(activities: WatchedActivity[], limit: number): Array<{ slot: string; items: WatchedActivity[] }> {

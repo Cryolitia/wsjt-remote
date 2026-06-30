@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 import logging
+import socket
 from typing import Any
 
 from . import protocol
@@ -11,16 +13,42 @@ from .state import AppState, extract_adif_call
 logger = logging.getLogger(__name__)
 
 
+@dataclass(slots=True)
+class UdpForwardTarget:
+    text: str
+    address: tuple[Any, ...]
+    sock: socket.socket
+
+
+class UdpForwarder:
+    def __init__(self, targets: list[str]):
+        self.targets = [_resolve_forward_target(target) for target in targets]
+
+    def forward(self, data: bytes) -> None:
+        for target in self.targets:
+            try:
+                target.sock.sendto(data, target.address)
+            except OSError as exc:
+                logger.warning("failed to forward raw UDP to %s: %s", target.text, exc)
+
+    def close(self) -> None:
+        for target in self.targets:
+            target.sock.close()
+
+
 class WSJTXUDPProtocol(asyncio.DatagramProtocol):
-    def __init__(self, state: AppState, broadcaster: Any):
+    def __init__(self, state: AppState, broadcaster: Any, forwarder: UdpForwarder | None = None):
         self.state = state
         self.broadcaster = broadcaster
+        self.forwarder = forwarder
 
     def connection_made(self, transport: asyncio.DatagramTransport) -> None:
         self.state.udp_transport = transport
         logger.info("udp socket ready")
 
     def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
+        if self.forwarder:
+            self.forwarder.forward(data)
         try:
             msg = protocol.parse_message(data)
             logger.debug("rx %s from %s:%s (%d bytes)", _message_type_name(msg), addr[0], addr[1], len(data))
@@ -85,13 +113,53 @@ class WSJTXUDPProtocol(asyncio.DatagramProtocol):
             await self.broadcaster({"event": "logged_adif", "data": {"adif": adif, "call": call}})
 
 
-async def start_udp(state: AppState, broadcaster: Any, host: str, port: int) -> asyncio.DatagramTransport:
+async def start_udp(state: AppState, broadcaster: Any, host: str, port: int, forwarder: UdpForwarder | None = None) -> asyncio.DatagramTransport:
     loop = asyncio.get_running_loop()
     transport, _ = await loop.create_datagram_endpoint(
-        lambda: WSJTXUDPProtocol(state, broadcaster),
+        lambda: WSJTXUDPProtocol(state, broadcaster, forwarder),
         local_addr=(host, port),
     )
     return transport
+
+
+def create_udp_forwarder(targets: list[str]) -> UdpForwarder | None:
+    if not targets:
+        return None
+    forwarder = UdpForwarder(targets)
+    for target in forwarder.targets:
+        logger.info("forwarding raw UDP to %s", target.text)
+    return forwarder
+
+
+def _resolve_forward_target(text: str) -> UdpForwardTarget:
+    host, port = _parse_forward_target(text)
+    infos = socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM)
+    if not infos:
+        raise ValueError(f"failed to resolve UDP forward target: {text}")
+    family, socktype, proto, _, address = infos[0]
+    sock = socket.socket(family, socktype, proto)
+    return UdpForwardTarget(text=text, address=address, sock=sock)
+
+
+def _parse_forward_target(text: str) -> tuple[str, int]:
+    value = text.strip()
+    if value.startswith("["):
+        end = value.find("]")
+        if end < 0 or end + 1 >= len(value) or value[end + 1] != ":":
+            raise ValueError(f"invalid UDP forward target: {text}")
+        host = value[1:end]
+        port_text = value[end + 2 :]
+    else:
+        host, sep, port_text = value.rpartition(":")
+        if not sep or ":" in host:
+            raise ValueError(f"invalid UDP forward target: {text}")
+    try:
+        port = int(port_text)
+    except ValueError as exc:
+        raise ValueError(f"invalid UDP forward port: {text}") from exc
+    if not host or not (0 < port <= 65535):
+        raise ValueError(f"invalid UDP forward target: {text}")
+    return host, port
 
 
 def send_datagram(state: AppState, data: bytes, message: protocol.Message | None = None) -> None:

@@ -108,6 +108,18 @@ nix run .#wsjt-remote -- --plugin-dir ./plugins
 
 `--plugin-decode-grace` controls how long the backend waits after the last decode in the same WSJT/JTDX time slot before calling plugin batch logic. The default is `1.0` second.
 
+Forward raw received WSJT-X/JTDX UDP packets to another UDP listener:
+
+```bash
+nix run .#wsjt-remote -- --udp-forward 192.0.2.10:2333
+```
+
+IPv6 targets must use brackets. Repeat `--udp-forward` to send each raw packet to multiple targets:
+
+```bash
+nix run .#wsjt-remote -- --udp-forward '[fd00::1]:2333' --udp-forward 192.0.2.10:2333
+```
+
 Logs are written to stderr. Use `--log-level` to change verbosity:
 
 ```bash

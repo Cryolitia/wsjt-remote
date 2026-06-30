@@ -11,7 +11,7 @@ from aiohttp import web
 
 from .plugins import PluginManager
 from .state import AppState
-from .udp import heartbeat_loop, start_udp
+from .udp import create_udp_forwarder, heartbeat_loop, start_udp
 from .web import create_app
 
 
@@ -40,7 +40,8 @@ async def run(args: argparse.Namespace) -> None:
     broadcaster = app["broadcast"]
     if state.plugins:
         state.plugins.broadcaster = broadcaster
-    transport = await start_udp(state, broadcaster, args.udp_host, args.udp_port)
+    forwarder = create_udp_forwarder(args.udp_forward)
+    transport = await start_udp(state, broadcaster, args.udp_host, args.udp_port, forwarder)
     heartbeat_task = asyncio.create_task(heartbeat_loop(state, broadcaster), name="wsjt-remote-heartbeat")
 
     runner = web.AppRunner(app, shutdown_timeout=2)
@@ -65,6 +66,8 @@ async def run(args: argparse.Namespace) -> None:
         with contextlib.suppress(asyncio.CancelledError):
             await heartbeat_task
         transport.close()
+        if forwarder:
+            forwarder.close()
         with contextlib.suppress(asyncio.TimeoutError):
             await asyncio.wait_for(runner.cleanup(), timeout=2)
 
@@ -73,6 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="WSJT-X remote web controller")
     parser.add_argument("--udp-host", default="0.0.0.0")
     parser.add_argument("--udp-port", type=int, default=2237)
+    parser.add_argument("--udp-forward", action="append", default=[], metavar="HOST:PORT", help="Forward raw received UDP packets to HOST:PORT; use [IPv6]:PORT for IPv6 targets. Repeat to add multiple targets")
     parser.add_argument("--web-host", default="127.0.0.1")
     parser.add_argument("--web-port", type=int, default=8080)
     parser.add_argument("--static-dir", default=str(default_static_dir()))

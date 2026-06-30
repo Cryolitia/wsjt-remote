@@ -38,6 +38,13 @@ class WSJTXUDPProtocol(asyncio.DatagramProtocol):
             logger.info("heartbeat from %s version=%s schema=%s", msg.id, msg.fields.get("version", ""), msg.schema)
             await self.broadcaster({"event": "state", "data": self.state.snapshot()})
         elif msg.type == protocol.MessageType.Status:
+            previous_frequency = self.state.status.get("dial_frequency")
+            next_frequency = msg.fields.get("dial_frequency")
+            frequency_changed = bool(previous_frequency and next_frequency and previous_frequency != next_frequency)
+            if frequency_changed:
+                self.state.clear_activity()
+                logger.info("dial frequency changed from %s to %s; cleared activity", previous_frequency, next_frequency)
+                await self.broadcaster({"event": "clear", "data": {"reason": "frequency", "dial_frequency": next_frequency}})
             self.state.status = dict(msg.fields)
             logger.info(
                 "status id=%s mode=%s tx_enabled=%s transmitting=%s tx_message=%r",
@@ -54,7 +61,7 @@ class WSJTXUDPProtocol(asyncio.DatagramProtocol):
             logger.info("decode #%s snr=%s df=%s message=%r", decode["index"], decode["snr"], decode["delta_frequency"], decode["message"])
             await self.broadcaster({"event": "decode", "data": decode})
         elif msg.type == protocol.MessageType.Clear:
-            self.state.decodes.clear()
+            self.state.clear_activity()
             logger.info("clear received id=%s fields=%s", msg.id, msg.fields)
             await self.broadcaster({"event": "clear", "data": msg.fields})
         elif msg.type == protocol.MessageType.Close:

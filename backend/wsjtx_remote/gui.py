@@ -16,12 +16,13 @@ def send_alt_n_to_wsjtx() -> None:
     logger.info("sent Alt+N to WSJT/JTDX")
 
 
-def trigger_cq_to_wsjtx() -> None:
+def trigger_cq_to_wsjtx(clear_dx: bool = True) -> None:
     _focus_wsjtx_window()
-    _run(["wtype", "-k", "F4"], "wtype F4 failed")
-    time.sleep(0.15)
+    if clear_dx:
+        _run(["wtype", "-k", "F4"], "wtype F4 failed")
+        time.sleep(0.15)
     _run(["wtype", "-M", "alt", "n", "-m", "alt"], "wtype Alt+N failed")
-    logger.info("sent F4 then Alt+N to WSJT/JTDX")
+    logger.info("sent %sAlt+N to WSJT/JTDX", "F4 then " if clear_dx else "")
 
 
 def _focus_wsjtx_window() -> None:

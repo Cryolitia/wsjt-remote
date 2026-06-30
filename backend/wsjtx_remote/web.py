@@ -147,9 +147,11 @@ async def _send(request: web.Request, data: bytes) -> web.Response:
 
 
 async def api_cq(request: web.Request) -> web.Response:
+    state: AppState = request.app["state"]
+    clear_dx = bool(str(state.status.get("dx_call") or "").strip() or str(state.status.get("dx_grid") or "").strip())
     logger.info("api cq requested")
     try:
-        trigger_cq_to_wsjtx()
+        trigger_cq_to_wsjtx(clear_dx=clear_dx)
     except RuntimeError as exc:
         logger.warning("api cq failed: %s", exc)
         return json_response({"error": str(exc)}, status=500)

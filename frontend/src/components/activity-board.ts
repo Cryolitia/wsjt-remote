@@ -161,11 +161,15 @@ export class ActivityBoard extends LitElement {
     this.watchedActivityKeys.clear();
   }
 
-  private clearWatchFromLink(event: Event) {
-    event.preventDefault();
+  clearAll() {
     this.watched.clear();
     this.clearMessages();
     this.watched = new Map(this.watched);
+  }
+
+  private clearWatchFromLink(event: Event) {
+    event.preventDefault();
+    this.clearAll();
   }
 
   private watch(decode: Decode) {

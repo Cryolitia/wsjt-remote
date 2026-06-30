@@ -369,10 +369,36 @@ html {
 
 body {
   min-height: 100vh;
+  padding-bottom: 0.5rem;
   background:
     radial-gradient(circle at top left, color-mix(in srgb, var(--app-accent) 16%, transparent), transparent 34rem),
     linear-gradient(180deg, var(--app-background), var(--app-background-muted));
   color: var(--app-text);
+}
+
+.ft8-progress {
+  position: fixed;
+  z-index: 1100;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 0.5rem;
+  background: color-mix(in srgb, var(--nord14) 18%, var(--app-surface));
+  pointer-events: none;
+}
+
+.ft8-progress--tx {
+  background: color-mix(in srgb, var(--nord11) 18%, var(--app-surface));
+}
+
+.ft8-progress__bar {
+  height: 100%;
+  background: var(--nord14);
+  transition: width 160ms linear;
+}
+
+.ft8-progress--tx .ft8-progress__bar {
+  background: var(--nord11);
 }
 
 main.container-fluid {
@@ -520,6 +546,33 @@ a:is(:hover, :focus) {
 
 mark {
   border-radius: var(--pico-border-radius);
+}
+
+.toast-stack {
+  position: fixed;
+  z-index: 1000;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  left: max(1rem, env(safe-area-inset-left));
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.toast-stack--above {
+  bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 3.5rem);
+}
+
+.toast {
+  max-width: min(42rem, 100%);
+  padding: 0.75rem 1rem;
+  border: var(--pico-border-width) solid color-mix(in srgb, var(--app-warning) 70%, var(--app-border));
+  border-radius: calc(var(--pico-border-radius) * 1.5);
+  background: color-mix(in srgb, var(--app-warning) 92%, var(--app-surface));
+  color: var(--nord0);
+  box-shadow: 0 0.75rem 2rem var(--app-shadow);
+  font-weight: 700;
+  pointer-events: auto;
 }
 
 table {

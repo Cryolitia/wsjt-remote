@@ -21,7 +21,7 @@ export class ActivityBoard extends LitElement {
 
   render() {
     return html`
-      ${this.message ? html`<p><mark>${this.message}</mark></p>` : null}
+      ${this.message ? html`<div class="toast-stack toast-stack--above"><div class="toast">${this.message}</div></div>` : null}
       <div class="grid">
         <article>
           <header>
@@ -54,7 +54,7 @@ export class ActivityBoard extends LitElement {
             </nav>
           </header>
           <table>
-            <thead><tr><th>Call</th><th>Sig</th><th>DT</th><th>Freq</th><th>Message</th><th>DXCC</th><th></th></tr></thead>
+            <thead><tr><th>Sig</th><th>DT</th><th>Freq</th><th>Message</th><th>DXCC</th><th></th></tr></thead>
             <tbody>${this.renderWatchedRows()}</tbody>
           </table>
         </article>
@@ -90,13 +90,12 @@ export class ActivityBoard extends LitElement {
   private renderWatchedRows() {
     const rows = [];
     for (const group of groupedWatchedActivities(this.watchedActivities, this.limit)) {
-      rows.push(html`<tr><th colspan="7"><small><strong>${group.slot}</strong></small></th></tr>`);
+      rows.push(html`<tr><th colspan="6"><small><strong>${group.slot}</strong></small></th></tr>`);
       for (const item of group.items) {
         const highlightClass = activityHighlightClass(item);
         const fullRowHighlight = shouldHighlightFullRow(item);
         rows.push(html`
           <tr class=${fullRowHighlight ? highlightClass : ""}>
-            <td><small><strong>${item.watchCall}</strong></small></td>
             <td><small>${item.snr}</small></td>
             <td><small>${formatDt(item.delta_time)}</small></td>
             <td><small>${item.delta_frequency}</small></td>

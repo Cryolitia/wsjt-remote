@@ -56,6 +56,7 @@ export type Decode = {
 
 export type Snapshot = {
   remote: Remote;
+  server_time?: string;
   status: Status;
   decodes: Decode[];
 };

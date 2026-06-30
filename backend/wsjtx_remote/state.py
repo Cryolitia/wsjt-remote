@@ -70,6 +70,7 @@ class AppState:
     def snapshot(self) -> dict[str, Any]:
         return {
             "remote": self.remote.to_json(),
+            "server_time": utc_now(),
             "status": self.status,
             "decodes": list(self.decodes),
         }

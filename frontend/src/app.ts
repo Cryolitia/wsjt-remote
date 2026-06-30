@@ -1,5 +1,5 @@
 import { LitElement, html } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import { postJson, wsUrl } from "./api";
 import "./components/backend-settings";
 import "./components/status-panel";
@@ -14,7 +14,9 @@ class UtcClock extends LitElement {
   }
 
   @state() private now = new Date();
+  @property({ type: String }) serverTime = "";
   private timer?: number;
+  private serverOffsetMs = 0;
 
   connectedCallback() {
     super.connectedCallback();
@@ -37,7 +39,61 @@ class UtcClock extends LitElement {
   }
 
   private tick() {
-    this.now = new Date();
+    this.now = new Date(Date.now() + this.serverOffsetMs);
+  }
+
+  updated(changed: Map<string, unknown>) {
+    if (!changed.has("serverTime")) return;
+    const serverMs = Date.parse(this.serverTime);
+    if (!Number.isFinite(serverMs)) return;
+    this.serverOffsetMs = serverMs - Date.now();
+    this.tick();
+  }
+}
+
+@customElement("ft8-progress")
+class Ft8Progress extends LitElement {
+  createRenderRoot() {
+    return this;
+  }
+
+  @property({ type: String }) serverTime = "";
+  @property({ type: Boolean }) transmitting = false;
+  @state() private progress = 0;
+  private timer?: number;
+  private serverOffsetMs = 0;
+
+  connectedCallback() {
+    super.connectedCallback();
+    this.tick();
+    this.timer = window.setInterval(() => this.tick(), 200);
+  }
+
+  disconnectedCallback() {
+    if (this.timer) window.clearInterval(this.timer);
+    super.disconnectedCallback();
+  }
+
+  render() {
+    return html`
+      <div class=${this.transmitting ? "ft8-progress ft8-progress--tx" : "ft8-progress"} aria-label="FT8 period progress">
+        <div class="ft8-progress__bar" style=${`width: ${this.progress}%`}></div>
+      </div>
+    `;
+  }
+
+  updated(changed: Map<string, unknown>) {
+    if (!changed.has("serverTime")) return;
+    const serverMs = Date.parse(this.serverTime);
+    if (!Number.isFinite(serverMs)) return;
+    this.serverOffsetMs = serverMs - Date.now();
+    this.tick();
+  }
+
+  private tick() {
+    const periodMs = 15_000;
+    const elapsed = (Date.now() + this.serverOffsetMs) % periodMs;
+    this.progress = (elapsed / periodMs) * 100;
   }
 }
 
@@ -47,7 +103,7 @@ class WSJTXApp extends LitElement {
     return this;
   }
 
-  @state() private snapshot: Snapshot = { remote: { connected: false, id: "", host: "", port: 0, schema: 3, version: "", revision: "", last_seen: "" }, status: {}, decodes: [] };
+  @state() private snapshot: Snapshot = { remote: { connected: false, id: "", host: "", port: 0, schema: 3, version: "", revision: "", last_seen: "" }, server_time: "", status: {}, decodes: [] };
   @state() private actionNotice = "";
   @state() private wsNotice = "";
   private ws?: WebSocket;
@@ -69,7 +125,7 @@ class WSJTXApp extends LitElement {
   render() {
     const txIdle = !this.snapshot.status.tx_enabled && !this.snapshot.status.transmitting;
     return html`
-      <utc-clock></utc-clock>
+      <utc-clock .serverTime=${this.snapshot.server_time || ""}></utc-clock>
       <nav>
         <ul><li><strong>WSJT-X Remote</strong></li></ul>
         <ul><li><a href="/debug">Debug</a></li></ul>
@@ -77,7 +133,7 @@ class WSJTXApp extends LitElement {
       <backend-settings @backend-change=${this.reconnect}></backend-settings>
       <status-panel .remote=${this.snapshot.remote} .status=${this.snapshot.status}></status-panel>
       ${this.wsNotice ? html`<p><mark>${this.wsNotice}</mark></p>` : null}
-      ${this.actionNotice ? html`<p><mark>${this.actionNotice}</mark></p>` : null}
+      ${this.actionNotice ? html`<div class="toast-stack"><div class="toast">${this.actionNotice}</div></div>` : null}
       <article>
         <fieldset role="group">
           <button @click=${this.cq}>CQ</button>
@@ -86,6 +142,7 @@ class WSJTXApp extends LitElement {
         </fieldset>
       </article>
       <activity-board .decodes=${this.snapshot.decodes} .status=${this.snapshot.status as Status}></activity-board>
+      <ft8-progress .serverTime=${this.snapshot.server_time || ""} .transmitting=${Boolean(this.snapshot.status.transmitting)}></ft8-progress>
     `;
   }
 

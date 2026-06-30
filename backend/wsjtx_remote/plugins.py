@@ -197,6 +197,8 @@ class PluginManager:
         message = protocol.parse_message(data)
         self.state.udp_transport.sendto(data, address)
         event = self.state.add_debug_event("tx", data, address, message)
+        if self.state.reply_watchdog:
+            self.state.reply_watchdog.reset_if_armed("plugin_reply")
         logger.info("plugin reply decode_index=%s message=%r", decode.get("index"), decode.get("message"))
         if self.broadcaster:
             asyncio.create_task(self.broadcaster({"event": "debug", "data": event}))

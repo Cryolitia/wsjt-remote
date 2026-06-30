@@ -256,7 +256,7 @@ See `plugins/japan_prefecture.py` for a test plugin that replaces Japan DXCC lab
 
 See `plugins/wwa.py` for a World Wide Award helper. Place `wwa_stations.txt` next to the plugin, with one callsign per line. Listed stations are highlighted while they have not been worked on the UTC day and band from `decode["received_at"]`. Set `WWA_AUTO_REPLY=1` to let the plugin reply only while TX is Idle. Direct callers are handled first: if any station is calling your callsign, the plugin replies to the strongest one by SNR without requiring WWA membership and without using pending or blacklist state. If no direct caller exists, it chooses unworked WWA CQ stations on the current day/band by highest SNR. Worked keys are recorded only from `LoggedADIF`, persisted as JSON in `/tmp/wsjt-remote/plugins/wwa_worked.json`, and pruned to the current UTC day on startup. If an auto-replied WWA CQ station is not logged before TX returns to Idle, that day/band/call key is blacklisted in memory for 30 minutes.
 
-The backend also runs a core FT8 watchdog. Any non-Idle Status starts a 150-second countdown, TX Idle disarms it, and a decode only resets it when the station calling your callsign matches the current DX call. If it expires while TX is still not Idle, the backend logs a warning and sends Halt TX.
+The backend also runs a core FT8 watchdog. Any non-Idle Status starts a 150-second countdown, TX Idle disarms it, and a decode only resets it when the station calling your callsign matches the current DX call. Manual/API Reply and plugin Reply also reset the countdown if it is already running. If it expires while TX is still not Idle, the backend logs a warning and sends Halt TX.
 
 ## Development
 

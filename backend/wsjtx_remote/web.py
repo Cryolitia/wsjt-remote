@@ -139,6 +139,8 @@ async def _send(request: web.Request, data: bytes) -> web.Response:
     msg = protocol.parse_message(data)
     try:
         send_datagram(state, data, msg)
+        if msg.type == protocol.MessageType.Reply and state.reply_watchdog:
+            state.reply_watchdog.arm("api_reply")
         await request.app["broadcast"]({"event": "debug", "data": state.debug_events[-1]})
     except Exception as exc:
         logger.warning("failed to send %s: %s", _message_type_name(msg), exc)

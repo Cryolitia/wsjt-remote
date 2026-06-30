@@ -76,6 +76,8 @@ class WSJTXUDPProtocol(asyncio.DatagramProtocol):
                 logger.info("dial frequency changed from %s to %s; cleared activity", previous_frequency, next_frequency)
                 await self.broadcaster({"event": "clear", "data": {"reason": "frequency", "dial_frequency": next_frequency}})
             self.state.status = dict(msg.fields)
+            if self.state.reply_watchdog:
+                self.state.reply_watchdog.on_status(self.state.status)
             if self.state.plugins:
                 self.state.plugins.on_status(self.state.status)
             logger.info(
@@ -92,6 +94,8 @@ class WSJTXUDPProtocol(asyncio.DatagramProtocol):
             decode = self.state.add_decode(msg)
             if self.state.plugins:
                 self.state.plugins.on_decode(decode)
+            if self.state.reply_watchdog:
+                self.state.reply_watchdog.on_decode(decode)
             logger.info("decode #%s snr=%s df=%s message=%r", decode["index"], decode["snr"], decode["delta_frequency"], decode["message"])
             await self.broadcaster({"event": "decode", "data": decode})
         elif msg.type == protocol.MessageType.Clear:

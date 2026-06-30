@@ -60,6 +60,7 @@ class AppState:
     websockets: set[Any] = field(default_factory=set)
     udp_transport: Any = None
     plugins: Any = None
+    reply_watchdog: Any = None
     next_decode_index: int = 1
     dxcc: DxccLookup = field(default_factory=DxccLookup)
     call_grids: dict[str, str] = field(default_factory=dict)
@@ -188,6 +189,12 @@ def extract_decode_callsign(message: str, own_call: str) -> str:
             return "UNKNOWN"
         return words[1] if is_call(words[1]) and words[1] != own else ""
     return ""
+
+
+def is_calling_own(message: str, own_call: str) -> bool:
+    own = own_call.upper().strip()
+    words = message.upper().split()
+    return bool(own and words and words[0] == own)
 
 
 def extract_decode_grid(message: str) -> str:

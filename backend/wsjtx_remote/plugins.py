@@ -13,7 +13,7 @@ from typing import Any
 from . import protocol
 from .adif_index import band_from_adif_freq, band_from_hz, dxcc_key, normalize_grid
 from .dxcc import normalize_call
-from .state import AppState, extract_decode_callsign, extract_decode_grid, is_call, is_grid
+from .state import AppState, extract_decode_callsign, extract_decode_grid, is_call, is_calling_own, is_grid
 
 
 logger = logging.getLogger(__name__)
@@ -73,9 +73,7 @@ class PluginContext:
         return any(word == "CQ" for word in message.upper().split())
 
     def is_calling_own(self, message: str) -> bool:
-        own = str(self._state.status.get("de_call") or "").upper()
-        words = message.upper().split()
-        return bool(own and words and words[0] == own)
+        return is_calling_own(message, str(self._state.status.get("de_call") or ""))
 
     def normalize_call(self, call: str) -> str:
         return normalize_call(call)
@@ -196,6 +194,8 @@ class PluginManager:
         message = protocol.parse_message(data)
         self.state.udp_transport.sendto(data, address)
         event = self.state.add_debug_event("tx", data, address, message)
+        if self.state.reply_watchdog:
+            self.state.reply_watchdog.arm("plugin_reply")
         logger.info("plugin reply decode_index=%s message=%r", decode.get("index"), decode.get("message"))
         if self.broadcaster:
             asyncio.create_task(self.broadcaster({"event": "debug", "data": event}))

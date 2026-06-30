@@ -12,6 +12,7 @@ from aiohttp import web
 from .plugins import PluginManager
 from .state import AppState
 from .udp import create_udp_forwarder, heartbeat_loop, start_udp
+from .watchdog import ReplyWatchdog
 from .web import create_app
 
 
@@ -40,6 +41,8 @@ async def run(args: argparse.Namespace) -> None:
     broadcaster = app["broadcast"]
     if state.plugins:
         state.plugins.broadcaster = broadcaster
+    state.reply_watchdog = ReplyWatchdog(state, broadcaster)
+    watchdog_task = asyncio.create_task(state.reply_watchdog.run(), name="wsjt-remote-reply-watchdog")
     forwarder = create_udp_forwarder(args.udp_forward)
     transport = await start_udp(state, broadcaster, args.udp_host, args.udp_port, forwarder)
     heartbeat_task = asyncio.create_task(heartbeat_loop(state, broadcaster), name="wsjt-remote-heartbeat")
@@ -63,8 +66,11 @@ async def run(args: argparse.Namespace) -> None:
         if state.plugins:
             state.plugins.on_stop()
         heartbeat_task.cancel()
+        watchdog_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await heartbeat_task
+        with contextlib.suppress(asyncio.CancelledError):
+            await watchdog_task
         transport.close()
         if forwarder:
             forwarder.close()

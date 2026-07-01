@@ -108,7 +108,6 @@ class WSJTXApp extends LitElement {
   @state() private wsNotice = "";
   private ws?: WebSocket;
   private reconnectTimer?: number;
-  private wasTransmitting = false;
   @query("activity-board") private activityBoard?: ActivityBoard;
 
   connectedCallback() {
@@ -177,14 +176,13 @@ class WSJTXApp extends LitElement {
   private handleMessage(payload: { event: string; data: unknown }) {
     if (payload.event === "state") {
       this.snapshot = payload.data as Snapshot;
-      this.trackTransmit(this.snapshot.status);
     }
     if (payload.event === "status") {
       const status = payload.data as Status;
       this.snapshot = { ...this.snapshot, status };
-      this.trackTransmit(status);
     }
     if (payload.event === "decode") this.snapshot = { ...this.snapshot, decodes: [...this.snapshot.decodes, payload.data as Decode].slice(-500) };
+    if (payload.event === "transmit") this.activityBoard?.handleTransmit(payload.data as Decode);
     if (payload.event === "clear") {
       this.snapshot = { ...this.snapshot, decodes: [] };
       const data = payload.data as { reason?: string } | undefined;
@@ -214,31 +212,8 @@ class WSJTXApp extends LitElement {
     }
   }
 
-  private trackTransmit(status: Status) {
-    const transmitting = Boolean(status.transmitting);
-    if (!transmitting) {
-      this.wasTransmitting = false;
-      return;
-    }
-    if (this.wasTransmitting) return;
-    this.wasTransmitting = true;
-    const message = transmitMessage(status);
-    if (!message) return;
-    this.activityBoard?.handleTransmit(message);
-  }
-
   private flash(message: string) {
     this.actionNotice = message;
     window.setTimeout(() => (this.actionNotice = ""), 2500);
   }
-}
-
-function transmitMessage(status: Status): string {
-  const explicit = String(status.tx_message || "").trim();
-  if (explicit) return explicit;
-  const ownCall = String(status.de_call || "").trim().toUpperCase();
-  const ownGrid = String(status.de_grid || "").trim().toUpperCase().slice(0, 4);
-  const dxCall = String(status.dx_call || "").trim().toUpperCase();
-  if (!dxCall) return ownCall && ownGrid ? `CQ ${ownCall} ${ownGrid}` : "CQ";
-  return `${dxCall} ${ownCall || "UNKNOWN"} UNKNOWN`;
 }

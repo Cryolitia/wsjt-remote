@@ -80,6 +80,7 @@ class WSJTXUDPProtocol(asyncio.DatagramProtocol):
                 self.state.reply_watchdog.on_status(self.state.status)
             if self.state.plugins:
                 self.state.plugins.on_status(self.state.status)
+            transmit = self.state.transmit_activity(self.state.status)
             logger.info(
                 "status id=%s mode=%s tx_enabled=%s transmitting=%s tx_message=%r",
                 msg.id,
@@ -89,6 +90,8 @@ class WSJTXUDPProtocol(asyncio.DatagramProtocol):
                 self.state.status.get("tx_message", ""),
             )
             await self.broadcaster({"event": "status", "data": self.state.status})
+            if transmit:
+                await self.broadcaster({"event": "transmit", "data": transmit})
             await self.broadcaster({"event": "state", "data": self.state.snapshot()})
         elif msg.type == protocol.MessageType.Decode:
             decode = self.state.add_decode(msg)

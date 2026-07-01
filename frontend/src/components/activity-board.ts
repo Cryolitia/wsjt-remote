@@ -91,7 +91,7 @@ export class ActivityBoard extends LitElement {
 
   private renderWatchedRows() {
     const rows = [];
-    for (const group of groupedWatchedActivities(this.watchedActivities, this.limit)) {
+    for (const group of groupedWatchedActivities(this.watchedActivities.slice(-this.limit))) {
       rows.push(html`<tr><th colspan="6"><small><strong>${group.slot}</strong></small></th></tr>`);
       for (const item of group.items) {
         const highlightClass = activityHighlightClass(item);
@@ -106,8 +106,8 @@ export class ActivityBoard extends LitElement {
             <td class=${fullRowHighlight ? "" : highlightClass} style=${fullRowHighlight ? "" : style}><small>${formatDxcc(item)}</small></td>
             <td>
               <small>
-                ${item.index >= 0 && item.id !== "local" ? html`<a href="#" @click=${(event: Event) => this.replyFromLink(event, item.index)}>Reply</a> · ` : null}
-                ${item.id !== "local" ? html`<a href="#" @click=${(event: Event) => this.unwatchFromLink(event, item.watchCall)}>Remove</a>` : null}
+                ${item.index >= 0 && !isTransmitActivity(item) ? html`<a href="#" @click=${(event: Event) => this.replyFromLink(event, item.index)}>Reply</a> · ` : null}
+                ${!isTransmitActivity(item) ? html`<a href="#" @click=${(event: Event) => this.unwatchFromLink(event, item.watchCall)}>Remove</a>` : null}
               </small>
             </td>
           </tr>
@@ -143,19 +143,8 @@ export class ActivityBoard extends LitElement {
     }
   }
 
-  handleTransmit(message: string) {
-    const now = new Date().toISOString();
-    this.addWatchedActivity("TX", {
-      index: 0,
-      id: "local",
-      received_at: now,
-      new: true,
-      time: now.slice(11, 23),
-      mode: String(this.status.mode || ""),
-      message,
-      low_confidence: false,
-      off_air: false,
-    });
+  handleTransmit(decode: Decode) {
+    this.addWatchedActivity("TX", decode);
   }
 
   clearMessages() {
@@ -184,7 +173,7 @@ export class ActivityBoard extends LitElement {
   }
 
   private watchIfCallingOwn(decode: Decode) {
-    if (decode.id === "local" || !isCallingOwnCall(decode.message, this.status.de_call)) return;
+    if (isTransmitActivity(decode) || !isCallingOwnCall(decode.message, this.status.de_call)) return;
     const now = new Date().toISOString();
     const callsign = extractCallsign(decode.message, this.status.de_call || "");
     if (!callsign) return;
@@ -313,13 +302,12 @@ function decodeKey(decode: Decode): string {
   return `${decode.index}:${decode.received_at}:${decode.message}`;
 }
 
-function groupedWatchedActivities(activities: WatchedActivity[], limit: number): Array<{ slot: string; items: WatchedActivity[] }> {
-  const limited = activities
+function groupedWatchedActivities(activities: WatchedActivity[]): Array<{ slot: string; items: WatchedActivity[] }> {
+  const ordered = activities
     .map((item, order) => ({ item, order }))
-    .sort((left, right) => activityTimeMs(left.item) - activityTimeMs(right.item) || left.order - right.order)
-    .slice(-limit);
+    .sort((left, right) => activityTimeMs(left.item) - activityTimeMs(right.item) || left.order - right.order);
   const groups = new Map<string, Array<{ item: WatchedActivity; order: number }>>();
-  for (const entry of limited) {
+  for (const entry of ordered) {
     const slot = timeSlot(entry.item.time);
     groups.set(slot, [...(groups.get(slot) || []), entry]);
   }
@@ -343,7 +331,7 @@ function slotTimeMs(slot: string): number {
 }
 
 function activityHighlightClass(decode: Decode): string {
-  if (decode.id === "local") return "activity-row--tx";
+  if (isTransmitActivity(decode)) return "activity-row--tx";
   if (pluginColorValue(decode)) return "activity-row--plugin";
   if (decode.worked_call_band) return "";
   if (decode.worked_call === true && decode.worked_call_band === false) return "activity-row--band-call";
@@ -356,8 +344,12 @@ function activityHighlightClass(decode: Decode): string {
 }
 
 function shouldHighlightFullRow(decode: Decode): boolean {
-  if (decode.id === "local") return true;
+  if (isTransmitActivity(decode)) return true;
   return isRepliable(decode.message);
+}
+
+function isTransmitActivity(decode: Decode): boolean {
+  return decode.id === "local" || decode.id === "server-tx";
 }
 
 function isRepliable(message: string): boolean {

@@ -62,6 +62,8 @@ class AppState:
     plugins: Any = None
     reply_watchdog: Any = None
     next_decode_index: int = 1
+    next_transmit_index: int = -1
+    was_transmitting: bool = False
     dxcc: DxccLookup = field(default_factory=DxccLookup)
     call_grids: dict[str, str] = field(default_factory=dict)
     adif: AdifIndex = field(init=False)
@@ -147,6 +149,29 @@ class AppState:
                 return decode
         return None
 
+    def transmit_activity(self, status: dict[str, Any]) -> dict[str, Any] | None:
+        transmitting = bool(status.get("transmitting"))
+        if not transmitting:
+            self.was_transmitting = False
+            return None
+        if self.was_transmitting:
+            return None
+        self.was_transmitting = True
+        received_at = utc_now()
+        item = {
+            "index": self.next_transmit_index,
+            "id": "server-tx",
+            "received_at": received_at,
+            "new": True,
+            "time": received_at[11:23],
+            "mode": str(status.get("mode") or ""),
+            "message": transmit_message(status),
+            "low_confidence": False,
+            "off_air": False,
+        }
+        self.next_transmit_index -= 1
+        return item
+
     def add_debug_event(
         self,
         direction: str,
@@ -174,6 +199,18 @@ def extract_adif_call(adif: str) -> str:
         return ""
     length = int(match.group(1))
     return match.group(2)[:length].upper()
+
+
+def transmit_message(status: dict[str, Any]) -> str:
+    explicit = str(status.get("tx_message") or "").strip()
+    if explicit:
+        return explicit
+    own_call = str(status.get("de_call") or "").strip().upper()
+    own_grid = str(status.get("de_grid") or "").strip().upper()[:4]
+    dx_call = str(status.get("dx_call") or "").strip().upper()
+    if not dx_call:
+        return f"CQ {own_call} {own_grid}" if own_call and own_grid else "CQ"
+    return f"{dx_call} {own_call or 'UNKNOWN'} UNKNOWN"
 
 
 def extract_decode_callsign(message: str, own_call: str) -> str:

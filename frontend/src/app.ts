@@ -103,7 +103,7 @@ class WSJTXApp extends LitElement {
     return this;
   }
 
-  @state() private snapshot: Snapshot = { remote: { connected: false, id: "", host: "", port: 0, schema: 3, version: "", revision: "", last_seen: "" }, server_time: "", status: {}, decodes: [] };
+  @state() private snapshot: Snapshot = { remote: { connected: false, id: "", host: "", port: 0, schema: 3, version: "", revision: "", last_seen: "" }, server_time: "", status: {}, decodes: [], transmits: [] };
   @state() private actionNotice = "";
   @state() private wsNotice = "";
   private ws?: WebSocket;
@@ -140,7 +140,7 @@ class WSJTXApp extends LitElement {
           <button class="secondary" @click=${this.clear}>Clear</button>
         </fieldset>
       </article>
-      <activity-board .decodes=${this.snapshot.decodes} .status=${this.snapshot.status as Status}></activity-board>
+      <activity-board .decodes=${this.snapshot.decodes} .transmits=${this.snapshot.transmits || []} .status=${this.snapshot.status as Status}></activity-board>
       <ft8-progress .serverTime=${this.snapshot.server_time || ""} .transmitting=${Boolean(this.snapshot.status.transmitting)}></ft8-progress>
     `;
   }

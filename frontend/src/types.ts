@@ -61,6 +61,7 @@ export type Snapshot = {
   server_time?: string;
   status: Status;
   decodes: Decode[];
+  transmits?: Decode[];
 };
 
 export type DebugEvent = {

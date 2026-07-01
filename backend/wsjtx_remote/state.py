@@ -56,6 +56,7 @@ class AppState:
     remote: RemoteClient = field(default_factory=RemoteClient)
     status: dict[str, Any] = field(default_factory=dict)
     decodes: deque[dict[str, Any]] = field(default_factory=lambda: deque(maxlen=500))
+    transmits: deque[dict[str, Any]] = field(default_factory=lambda: deque(maxlen=500))
     debug_events: deque[dict[str, Any]] = field(default_factory=lambda: deque(maxlen=500))
     websockets: set[Any] = field(default_factory=set)
     udp_transport: Any = None
@@ -77,6 +78,7 @@ class AppState:
             "server_time": utc_now(),
             "status": self.status,
             "decodes": list(self.decodes),
+            "transmits": list(self.transmits),
         }
 
     def clear_activity(self) -> None:
@@ -170,6 +172,7 @@ class AppState:
             "off_air": False,
         }
         self.next_transmit_index -= 1
+        self.transmits.append(item)
         return item
 
     def add_debug_event(

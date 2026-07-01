@@ -12,6 +12,7 @@ export class ActivityBoard extends LitElement {
   }
 
   @property({ type: Array }) decodes: Decode[] = [];
+  @property({ type: Array }) transmits: Decode[] = [];
   @property({ type: Object }) status: Status = {};
   @state() private watched = new Map<string, WatchedCall>();
   @state() private watchedActivities: WatchedActivity[] = [];
@@ -139,6 +140,11 @@ export class ActivityBoard extends LitElement {
         this.processedDecodeKeys.add(key);
         this.watchIfCallingOwn(decode);
         this.matchWatched(decode);
+      }
+    }
+    if (changed.has("transmits")) {
+      for (const transmit of this.transmits) {
+        this.handleTransmit(transmit);
       }
     }
   }

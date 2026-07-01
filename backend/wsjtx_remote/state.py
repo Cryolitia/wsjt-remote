@@ -83,6 +83,7 @@ class AppState:
 
     def clear_activity(self) -> None:
         self.decodes.clear()
+        self.transmits.clear()
         self.call_grids.clear()
 
     def update_remote(self, msg: protocol.Message, addr: tuple[str, int]) -> None:

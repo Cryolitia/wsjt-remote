@@ -602,6 +602,17 @@ tbody tr:is(:hover, :focus-within) td {
   background-color: var(--app-surface-selected);
 }
 
+.activity-slot-heading {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.activity-slot-count {
+  opacity: 0.75;
+  text-align: right;
+}
+
 .activity-row--tx {
   --activity-row-bg: color-mix(in srgb, var(--nord14) 96%, var(--app-surface));
   --activity-row-fg: var(--nord0);

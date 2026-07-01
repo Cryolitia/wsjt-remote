@@ -196,9 +196,17 @@ async def api_halt_tx(request: web.Request) -> web.Response:
 
 
 async def api_clear(request: web.Request) -> web.Response:
+    state: AppState = request.app["state"]
     body = await request.json() if request.can_read_body else {}
-    logger.info("api clear window=%s", int(body.get("window", 2)))
-    return await _send(request, protocol.build_clear(request.app["state"].remote.id, int(body.get("window", 2)), request.app["state"].remote.schema))
+    window = int(body.get("window", 2))
+    logger.info("api clear window=%s", window)
+    response = await _send(request, protocol.build_clear(state.remote.id, window, state.remote.schema))
+    if response.status < 400:
+        state.clear_activity()
+        if state.plugins:
+            state.plugins.cancel_batches()
+        await request.app["broadcast"]({"event": "clear", "data": {"window": window}})
+    return response
 
 
 async def api_replay(request: web.Request) -> web.Response:

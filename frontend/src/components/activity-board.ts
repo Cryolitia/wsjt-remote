@@ -67,13 +67,15 @@ export class ActivityBoard extends LitElement {
   private renderDecodeRows() {
     const rows = [];
     let lastSlot = "";
-    for (const decode of this.decodes.slice(-this.limit).reverse()) {
+    const displayed = this.decodes.slice(-this.limit);
+    const counts = slotCounts(displayed);
+    for (const decode of displayed.reverse()) {
       const slot = timeSlot(decode.time);
       const highlightClass = activityHighlightClass(decode);
       const fullRowHighlight = shouldHighlightFullRow(decode);
       const style = pluginColorStyle(decode);
       if (slot !== lastSlot) {
-        rows.push(html`<tr><th colspan="6"><small><strong>${slot}</strong></small></th></tr>`);
+        rows.push(html`<tr><th colspan="6"><small><strong class="activity-slot-heading"><span>${slot}</span><span class="activity-slot-count">${counts.get(slot) || 0}</span></strong></small></th></tr>`);
         lastSlot = slot;
       }
       rows.push(html`
@@ -306,6 +308,15 @@ function activityTimeMs(decode: Decode): number {
 
 function decodeKey(decode: Decode): string {
   return `${decode.index}:${decode.received_at}:${decode.message}`;
+}
+
+function slotCounts(decodes: Decode[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const decode of decodes) {
+    const slot = timeSlot(decode.time);
+    counts.set(slot, (counts.get(slot) || 0) + 1);
+  }
+  return counts;
 }
 
 function groupedWatchedActivities(activities: WatchedActivity[]): Array<{ slot: string; items: WatchedActivity[] }> {

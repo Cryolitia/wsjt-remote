@@ -119,7 +119,7 @@ def on_decode(ctx, decode):
     band = ctx.current_band()
     if code not in worked_prefectures:
         decode["plugin_color"] = NEW_PREFECTURE_COLOR
-    elif band and code not in worked_prefectures_by_band.get(band, set()):
+    elif band and code not in worked_prefectures_by_band.get(band, set()) and not _has_strong_grid(decode):
         decode["plugin_color"] = BAND_PREFECTURE_COLOR
     logger.debug(
         "japan_prefecture matched call=%s prefecture=%s band=%s color=%s",
@@ -210,6 +210,10 @@ def _call_variants(call):
 def _is_japan_call(ctx, call):
     match = ctx.lookup_dxcc(call)
     return bool(match and match.entity == "Japan")
+
+
+def _has_strong_grid(decode):
+    return bool(decode.get("worked_grid4") and decode.get("worked_grid") is False)
 
 
 def _canonical_prefecture(value):

@@ -79,7 +79,7 @@ def on_decode(ctx, decode):
     band = ctx.current_band()
     if province not in worked_provinces:
         decode["plugin_color"] = NEW_PROVINCE_COLOR
-    elif band and province not in worked_provinces_by_band.get(band, set()):
+    elif band and province not in worked_provinces_by_band.get(band, set()) and not _has_strong_grid(decode):
         decode["plugin_color"] = BAND_PROVINCE_COLOR
     logger.debug("china_province matched call=%s province=%s band=%s color=%s", call, province, band, decode.get("plugin_color", ""))
 
@@ -107,6 +107,10 @@ def _rebuild_worked_areas(ctx):
 def _is_china_call(ctx, call):
     match = ctx.lookup_dxcc(call)
     return bool(match and match.entity == "China")
+
+
+def _has_strong_grid(decode):
+    return bool(decode.get("worked_grid4") and decode.get("worked_grid") is False)
 
 
 def _china_province(call):

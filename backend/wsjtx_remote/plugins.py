@@ -202,6 +202,16 @@ class PluginManager:
         logger.info("plugin reply decode_index=%s message=%r", decode.get("index"), decode.get("message"))
         if self.broadcaster:
             asyncio.create_task(self.broadcaster({"event": "debug", "data": event}))
+            callsign = extract_decode_callsign(str(decode.get("message") or ""), str(self.state.status.get("de_call") or ""))
+            if callsign and callsign != "UNKNOWN":
+                asyncio.create_task(
+                    self.broadcaster(
+                        {
+                            "event": "watch",
+                            "data": {"action": "add", "callsign": callsign, "decode": decode, "source": "plugin_reply", "auto": True},
+                        }
+                    )
+                )
 
     def _load_file(self, path: Path) -> None:
         name = path.stem

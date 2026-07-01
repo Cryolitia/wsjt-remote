@@ -18,6 +18,7 @@ export class ActivityBoard extends LitElement {
   @state() private watchedActivities: WatchedActivity[] = [];
   @state() private message = "";
   @state() private limit = 50;
+  private autoWatched = new Set<string>();
   private watchedActivityKeys = new Set<string>();
   private processedDecodeKeys = new Set<string>();
 
@@ -140,8 +141,10 @@ export class ActivityBoard extends LitElement {
         const key = decodeKey(decode);
         if (this.processedDecodeKeys.has(key)) continue;
         this.processedDecodeKeys.add(key);
-        this.watchIfCallingOwn(decode);
+        const endedCall = qsoEndedBy73(decode.message, this.status.de_call || "");
+        if (!endedCall) this.watchIfCallingOwn(decode);
         this.matchWatched(decode);
+        if (endedCall) this.removeWatchOnly(endedCall);
       }
     }
     if (changed.has("transmits")) {
@@ -153,6 +156,22 @@ export class ActivityBoard extends LitElement {
 
   handleTransmit(decode: Decode) {
     this.addWatchedActivity("TX", decode);
+    this.removeAutoWatchIf73(decode);
+  }
+
+  handleWatchEvent(event: { action?: string; callsign?: string; decode?: Decode; auto?: boolean }) {
+    if (event.action !== "add" || !event.callsign || !event.decode) return;
+    const callsign = event.callsign.toUpperCase();
+    const existed = this.watched.has(callsign);
+    this.addWatch(callsign, event.decode);
+    if (event.auto && !existed) this.autoWatched.add(callsign);
+  }
+
+  clearTransmits() {
+    this.watchedActivities = this.watchedActivities.filter((item) => !isTransmitActivity(item));
+    for (const key of Array.from(this.watchedActivityKeys)) {
+      if (key.startsWith("TX:")) this.watchedActivityKeys.delete(key);
+    }
   }
 
   clearMessages() {
@@ -162,13 +181,19 @@ export class ActivityBoard extends LitElement {
 
   clearAll() {
     this.watched.clear();
+    this.autoWatched.clear();
     this.clearMessages();
     this.watched = new Map(this.watched);
   }
 
-  private clearWatchFromLink(event: Event) {
+  private async clearWatchFromLink(event: Event) {
     event.preventDefault();
     this.clearAll();
+    try {
+      await postJson("/api/transmits/clear");
+    } catch (error) {
+      this.flash(String(error));
+    }
   }
 
   private watch(decode: Decode) {
@@ -177,6 +202,7 @@ export class ActivityBoard extends LitElement {
       this.flash("无法从消息中识别呼号");
       return;
     }
+    this.autoWatched.delete(callsign);
     this.addWatch(callsign, decode);
   }
 
@@ -218,11 +244,25 @@ export class ActivityBoard extends LitElement {
   private unwatch(callsign: string) {
     const call = callsign.toUpperCase();
     this.watched.delete(call);
+    this.autoWatched.delete(call);
     this.watchedActivities = this.watchedActivities.filter((item) => item.watchCall !== call);
     for (const key of Array.from(this.watchedActivityKeys)) {
       if (key.startsWith(`${call}:`)) this.watchedActivityKeys.delete(key);
     }
     this.watched = new Map(this.watched);
+  }
+
+  private removeWatchOnly(callsign: string) {
+    const call = callsign.toUpperCase();
+    if (!this.autoWatched.has(call)) return;
+    this.watched.delete(call);
+    this.autoWatched.delete(call);
+    this.watched = new Map(this.watched);
+  }
+
+  private removeAutoWatchIf73(decode: Decode) {
+    const callsign = qsoEndedBy73(decode.message, this.status.de_call || "");
+    if (callsign) this.removeWatchOnly(callsign);
   }
 
   private addWatchedActivity(call: string, decode: Decode) {
@@ -264,6 +304,15 @@ function extractCallsign(message: string, ownCall: string): string {
     return words.find((word, index) => index > 0 && isCall(word) && word !== own) || "";
   }
   if (words.length >= 2) return isCall(words[1]) && words[1] !== own ? words[1] : "";
+  return "";
+}
+
+function qsoEndedBy73(message: string, ownCall: string): string {
+  const words = message.toUpperCase().split(/\s+/).filter(Boolean);
+  const own = ownCall.toUpperCase();
+  if (!own || words.length < 2 || !words.some((word) => word === "73")) return "";
+  if (words[0] === own && isCall(words[1]) && words[1] !== own) return words[1];
+  if (words[1] === own && isCall(words[0]) && words[0] !== own) return words[0];
   return "";
 }
 

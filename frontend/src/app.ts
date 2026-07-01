@@ -183,6 +183,8 @@ class WSJTXApp extends LitElement {
     }
     if (payload.event === "decode") this.snapshot = { ...this.snapshot, decodes: [...this.snapshot.decodes, payload.data as Decode].slice(-500) };
     if (payload.event === "transmit") this.activityBoard?.handleTransmit(payload.data as Decode);
+    if (payload.event === "watch") this.activityBoard?.handleWatchEvent(payload.data as { action?: string; callsign?: string; decode?: Decode; auto?: boolean });
+    if (payload.event === "transmits-cleared") this.activityBoard?.clearTransmits();
     if (payload.event === "clear") {
       this.snapshot = { ...this.snapshot, decodes: [] };
       const data = payload.data as { reason?: string } | undefined;

@@ -86,6 +86,9 @@ class AppState:
         self.transmits.clear()
         self.call_grids.clear()
 
+    def clear_transmits(self) -> None:
+        self.transmits.clear()
+
     def update_remote(self, msg: protocol.Message, addr: tuple[str, int]) -> None:
         self.remote.id = msg.id
         self.remote.host = addr[0]

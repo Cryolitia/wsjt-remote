@@ -72,6 +72,7 @@ async def create_app(state: AppState, static_dir: Path) -> web.Application:
     app.router.add_post("/api/alt-n", api_alt_n)
     app.router.add_post("/api/halt-tx", api_halt_tx)
     app.router.add_post("/api/clear", api_clear)
+    app.router.add_post("/api/transmits/clear", api_clear_transmits)
     app.router.add_post("/api/replay", api_replay)
     app.router.add_get("/api/debug/events", api_debug_events)
     app.router.add_post("/api/debug/send", api_debug_send)
@@ -207,6 +208,14 @@ async def api_clear(request: web.Request) -> web.Response:
             state.plugins.cancel_batches()
         await request.app["broadcast"]({"event": "clear", "data": {"window": window}})
     return response
+
+
+async def api_clear_transmits(request: web.Request) -> web.Response:
+    state: AppState = request.app["state"]
+    logger.info("api clear transmits")
+    state.clear_transmits()
+    await request.app["broadcast"]({"event": "transmits-cleared", "data": {}})
+    return json_response({"ok": True})
 
 
 async def api_replay(request: web.Request) -> web.Response:

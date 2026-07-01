@@ -261,11 +261,15 @@ def _selection_key(ctx, decode, call):
 def _direct_call_candidates(ctx, decodes):
     candidates = []
     skipped_not_calling_me = 0
+    skipped_73 = 0
     skipped_no_key = 0
     for decode in decodes:
         message = str(decode.get("message") or "")
         if not ctx.is_calling_own(message):
             skipped_not_calling_me += 1
+            continue
+        if _is_73_message(message):
+            skipped_73 += 1
             continue
         call = _decode_any_call(ctx, decode)
         key = _selection_key(ctx, decode, call)
@@ -275,9 +279,10 @@ def _direct_call_candidates(ctx, decodes):
         candidates.append((int(decode.get("snr") or -999), key, decode))
     if candidates:
         logger.info(
-            "wwa direct-call candidates=%s skipped_not_calling_me=%d skipped_no_key=%d",
+            "wwa direct-call candidates=%s skipped_not_calling_me=%d skipped_73=%d skipped_no_key=%d",
             [(key[2], snr, decode.get("index")) for snr, key, decode in sorted(candidates, reverse=True)],
             skipped_not_calling_me,
+            skipped_73,
             skipped_no_key,
         )
     return candidates
@@ -352,6 +357,10 @@ def _blacklisted(key, now):
         return False
     logger.debug("wwa skipped blacklisted call=%s day=%s band=%s until=%s", key[2], key[0].isoformat(), key[1], until.isoformat())
     return True
+
+
+def _is_73_message(message):
+    return any(word == "73" for word in message.upper().split())
 
 
 def _cache_date(value):

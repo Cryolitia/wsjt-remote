@@ -108,6 +108,7 @@
             pname = "wsjt-remote";
             version = "0.1.0";
             dontUnpack = true;
+            buildInputs = [ backend frontend ];
 
             installPhase = ''
               runHook preInstall

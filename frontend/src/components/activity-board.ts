@@ -84,7 +84,7 @@ export class ActivityBoard extends LitElement {
           <td><small><strong>${formatSnr(decode.snr)}</strong></small></td>
           <td><small>${formatDt(decode.delta_time)}</small></td>
           <td><small>${formatDf(decode.delta_frequency)}</small></td>
-          <td><small class=${activityMessageClass(decode, this.status.de_call)}>${decode.message}</small></td>
+          <td><small class=${activityMessageClass(decode, this.status.de_call)}>${renderMessageWithQrzLinks(decode.message)}</small></td>
           <td class=${fullRowHighlight ? "" : highlightClass} style=${fullRowHighlight ? "" : style}><small>${formatDxcc(decode)}</small></td>
           <td><small><a href="#" @click=${(event: Event) => this.replyAndWatchFromLink(event, decode)}>Reply</a></small></td>
         </tr>
@@ -106,7 +106,7 @@ export class ActivityBoard extends LitElement {
             <td><small>${formatSnr(item.snr)}</small></td>
             <td><small>${formatDt(item.delta_time)}</small></td>
             <td><small>${formatDf(item.delta_frequency)}</small></td>
-            <td><small class=${activityMessageClass(item, this.status.de_call)}>${item.message}</small></td>
+            <td><small class=${activityMessageClass(item, this.status.de_call)}>${renderMessageWithQrzLinks(item.message)}</small></td>
             <td class=${fullRowHighlight ? "" : highlightClass} style=${fullRowHighlight ? "" : style}><small>${formatDxcc(item)}</small></td>
             <td>
               <small>
@@ -399,14 +399,21 @@ function slotTimeMs(slot: string): number {
 function activityHighlightClass(decode: Decode): string {
   if (isTransmitActivity(decode)) return "activity-row--tx";
   if (pluginColorValue(decode)) return "activity-row--plugin";
-  if (decode.worked_call_band) return "";
-  if (decode.worked_call === true && decode.worked_call_band === false) return "activity-row--band-call";
   if (decode.dxcc_entity && decode.worked_dxcc === false) return "activity-row--new-dxcc";
-  if (decode.dxcc_entity && decode.worked_dxcc === true && decode.worked_dxcc_band === false) return "activity-row--band-dxcc";
   if (decode.worked_grid4 && decode.worked_grid === false) return "activity-row--new-grid";
-  if (decode.worked_grid4 && decode.worked_grid === true && decode.worked_grid_band === false) return "activity-row--band-grid";
   if (decode.worked_call === false) return "activity-row--new-call";
+  if (decode.dxcc_entity && decode.worked_dxcc === true && decode.worked_dxcc_band === false) return "activity-row--band-dxcc";
+  if (decode.worked_grid4 && decode.worked_grid === true && decode.worked_grid_band === false) return "activity-row--band-grid";
+  if (decode.worked_call === true && decode.worked_call_band === false) return "activity-row--band-call";
   return "";
+}
+
+function renderMessageWithQrzLinks(message: string) {
+  return message.split(/(\s+)/).map((part) => {
+    const token = part.trim().toUpperCase();
+    if (!token || !isCall(token)) return part;
+    return html`<a href=${`https://qrz.com/db/${token}`} target="_blank" rel="noopener noreferrer">${part}</a>`;
+  });
 }
 
 function shouldHighlightFullRow(decode: Decode): boolean {

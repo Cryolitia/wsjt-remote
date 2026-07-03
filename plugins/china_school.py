@@ -53,8 +53,7 @@ def on_decode(ctx, decode):
 
     school_call, school_name = entry
     contribution = {
-        "dxcc_label": f"中国\n{school_name}",
-        "dxcc_entity": "China",
+        "plugin_note": school_name,
     }
     band = ctx.current_band()
     if school_call not in worked_schools:

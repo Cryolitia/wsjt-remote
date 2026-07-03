@@ -28,8 +28,6 @@ WORKED_FIELDS = (
     "worked_grid4",
 )
 CONTRIBUTION_FIELDS = (
-    "dxcc_label",
-    "dxcc_entity",
     "plugin_color",
     "plugin_note",
 )
@@ -275,7 +273,6 @@ class PluginManager:
         if not self.plugins:
             return {}
         ctx = PluginContext(self, self._adif_snapshot())
-        label: dict[str, Any] = {}
         note = ""
         strong_color = ""
         weak_color = ""
@@ -290,13 +287,9 @@ class PluginManager:
                 continue
             if not isinstance(result, dict):
                 continue
-            if not label:
-                dxcc_label = result.get("dxcc_label")
-                dxcc_entity = result.get("dxcc_entity")
-                if dxcc_label or dxcc_entity:
-                    label = {key: value for key, value in {"dxcc_label": dxcc_label, "dxcc_entity": dxcc_entity}.items() if value}
-            if not note and result.get("plugin_note"):
-                note = str(result["plugin_note"])
+            candidate_note = str(result.get("plugin_note") or "").strip()
+            if not note and candidate_note:
+                note = candidate_note
             color = str(result.get("plugin_color") or "").strip()
             if not color:
                 continue
@@ -305,7 +298,7 @@ class PluginManager:
                     weak_color = color
             elif not strong_color:
                 strong_color = color
-        merged = dict(label)
+        merged = {}
         if note:
             merged["plugin_note"] = note
         if strong_color:

@@ -115,8 +115,7 @@ def on_decode(ctx, decode):
 
     prefecture = entry["prefecture_zh"]
     contribution = {
-        "dxcc_label": f"日本\n{prefecture}",
-        "dxcc_entity": "Japan",
+        "plugin_note": prefecture,
     }
 
     code = entry["waja"]

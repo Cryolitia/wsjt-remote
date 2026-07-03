@@ -76,8 +76,7 @@ def on_decode(ctx, decode):
         return
 
     contribution = {
-        "dxcc_label": f"中国\n{province}",
-        "dxcc_entity": "China",
+        "plugin_note": province,
     }
 
     band = ctx.current_band()

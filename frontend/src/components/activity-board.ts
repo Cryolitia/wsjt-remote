@@ -346,10 +346,12 @@ function formatDf(value?: number): string {
 }
 
 function formatDxcc(decode: Decode) {
-  const label = decode.dxcc_call === "UNKNOWN" ? "Unknown" : decode.dxcc_label || decode.dxcc_entity || "-";
-  const lines = label.split("\n").filter((line) => line.length > 0);
-  if (lines.length <= 1) return html`<small>${label}</small>`;
-  return html`${lines[0]}<br />${lines.slice(1).map((line) => html`<small>${line}</small>`)}`;
+  const dxcc = decode.dxcc_call === "UNKNOWN" ? "Unknown" : decode.dxcc_label || decode.dxcc_entity || "";
+  const note = decode.plugin_note?.trim() || "";
+  if (!dxcc && !note) return html`<small>-</small>`;
+  if (!note) return dxcc;
+  if (!dxcc) return html`<small>${note}</small>`;
+  return html`${dxcc} <small>${note}</small>`;
 }
 
 function activityTimeMs(decode: Decode): number {

@@ -528,6 +528,48 @@ backend-settings fieldset[role="group"] > button {
   white-space: nowrap;
 }
 
+.main-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: stretch;
+  margin-bottom: 0;
+}
+
+.main-actions > button {
+  flex: 1 1 0;
+  width: auto;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.main-actions > .auto-reply-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: auto;
+  margin-bottom: 0;
+  padding: var(--pico-form-element-spacing-vertical) var(--pico-form-element-spacing-horizontal);
+  border: var(--pico-border-width) solid var(--pico-form-element-border-color);
+  border-radius: var(--pico-border-radius);
+  background: var(--pico-form-element-background-color);
+  color: var(--pico-form-element-color);
+  line-height: var(--pico-line-height);
+  white-space: nowrap;
+}
+
+.main-actions > .auto-reply-toggle > input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.main-actions > .auto-reply-toggle:has(input[type="checkbox"]:checked) {
+  border-color: var(--nord11);
+  background: var(--nord11);
+  color: var(--nord6);
+}
+
 @media (max-width: 48rem) {
   backend-settings fieldset[role="group"] {
     flex-direction: column;
@@ -535,6 +577,14 @@ backend-settings fieldset[role="group"] > button {
 
   backend-settings fieldset[role="group"] > :is(input, button) {
     width: 100%;
+  }
+
+  .main-actions {
+    flex-wrap: wrap;
+  }
+
+  .main-actions > button {
+    flex-basis: calc((100% - 1.5rem) / 3);
   }
 }
 

@@ -134,11 +134,11 @@ class WSJTXApp extends LitElement {
       ${this.wsNotice ? html`<p><mark>${this.wsNotice}</mark></p>` : null}
       ${this.actionNotice ? html`<div class="toast-stack"><div class="toast">${this.actionNotice}</div></div>` : null}
       <article>
-        <fieldset role="group">
+        <fieldset class="main-actions" role="group">
           <button @click=${this.cq}>CQ</button>
           <button class=${txIdle ? "secondary" : "contrast"} @click=${this.halt}>Halt TX</button>
           <button class="secondary" @click=${this.clear}>Clear</button>
-          <label>
+          <label class="auto-reply-toggle">
             <input type="checkbox" .checked=${Boolean(this.snapshot.auto_reply_enabled)} @change=${this.setAutoReply} />
             Auto Reply
           </label>

@@ -42,7 +42,6 @@ def on_decode(ctx, decode):
     if key not in worked_keys:
         logger.debug("wwa highlighted call=%s day=%s band=%s", call, key[0].isoformat(), key[1])
         return {
-            "plugin_note": "WWA listed station not worked today on this band",
             "plugin_color": "nord8",
         }
 

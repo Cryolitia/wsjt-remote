@@ -62,6 +62,7 @@ class AppState:
     udp_transport: Any = None
     plugins: Any = None
     reply_watchdog: Any = None
+    auto_reply_enabled: bool = False
     next_decode_index: int = 1
     next_transmit_index: int = -1
     was_transmitting: bool = False
@@ -76,6 +77,7 @@ class AppState:
         return {
             "remote": self.remote.to_json(),
             "server_time": utc_now(),
+            "auto_reply_enabled": self.auto_reply_enabled,
             "status": self.status,
             "decodes": list(self.decodes),
             "transmits": list(self.transmits),

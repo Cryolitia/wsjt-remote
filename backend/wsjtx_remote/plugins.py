@@ -27,6 +27,13 @@ WORKED_FIELDS = (
     "worked_dxcc_band",
     "worked_grid4",
 )
+CONTRIBUTION_FIELDS = (
+    "dxcc_label",
+    "dxcc_entity",
+    "plugin_color",
+    "plugin_note",
+)
+DEFAULT_ORDER = 999
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,6 +139,7 @@ class PluginContext:
 class Plugin:
     name: str
     module: ModuleType
+    order: int
 
 
 class PluginManager:
@@ -158,6 +166,8 @@ class PluginManager:
             if path.name.startswith("_"):
                 continue
             self._load_file(path)
+        self._warn_duplicate_orders()
+        self.plugins.sort(key=lambda plugin: (plugin.order, plugin.name))
         logger.info("loaded %d plugin(s) from %s", len(self.plugins), directory)
 
     def on_start(self) -> None:
@@ -173,10 +183,16 @@ class PluginManager:
     def on_decode(self, decode: dict[str, Any]) -> None:
         worked = {field: decode[field] for field in WORKED_FIELDS if field in decode}
         removed = [field for field in WORKED_FIELDS if field not in decode]
-        self._call("on_decode", decode)
+        protected = {field: decode[field] for field in CONTRIBUTION_FIELDS if field in decode}
+        protected_removed = [field for field in CONTRIBUTION_FIELDS if field not in decode]
+        contribution = self._decode_contribution(decode)
         for field in removed:
             decode.pop(field, None)
         decode.update(worked)
+        for field in protected_removed:
+            decode.pop(field, None)
+        decode.update(protected)
+        decode.update(contribution)
         self._add_decode_to_batch(decode)
 
     def on_logged_adif(self, raw_adif: str, indexed_count: int) -> None:
@@ -225,7 +241,85 @@ class PluginManager:
         except Exception as exc:
             logger.warning("failed to load plugin %s: %s", path, exc)
             return
-        self.plugins.append(Plugin(name=name, module=module))
+        self.plugins.append(Plugin(name=name, module=module, order=self._plugin_order(name, module)))
+
+    def _plugin_order(self, name: str, module: ModuleType) -> int:
+        if not hasattr(module, "ORDER"):
+            logger.warning("plugin %s has no ORDER; defaulting to %d", name, DEFAULT_ORDER)
+            return DEFAULT_ORDER
+        value = getattr(module, "ORDER")
+        if isinstance(value, bool):
+            logger.warning("plugin %s ORDER=%r is invalid; defaulting to %d", name, value, DEFAULT_ORDER)
+            return DEFAULT_ORDER
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            logger.warning("plugin %s ORDER=%r is invalid; defaulting to %d", name, value, DEFAULT_ORDER)
+            return DEFAULT_ORDER
+
+    def _warn_duplicate_orders(self) -> None:
+        seen: dict[int, str] = {}
+        for plugin in self.plugins:
+            existing = seen.get(plugin.order)
+            if existing is not None:
+                logger.warning(
+                    "duplicate plugin ORDER %d: %s and %s; behavior is undefined",
+                    plugin.order,
+                    existing,
+                    plugin.name,
+                )
+                continue
+            seen[plugin.order] = plugin.name
+
+    def _decode_contribution(self, decode: dict[str, Any]) -> dict[str, Any]:
+        if not self.plugins:
+            return {}
+        ctx = PluginContext(self, self._adif_snapshot())
+        label: dict[str, Any] = {}
+        note = ""
+        strong_color = ""
+        weak_color = ""
+        for plugin in self.plugins:
+            fn = getattr(plugin.module, "on_decode", None)
+            if not callable(fn):
+                continue
+            try:
+                result = fn(ctx, dict(decode))
+            except Exception as exc:
+                logger.warning("plugin %s on_decode failed: %s", plugin.name, exc)
+                continue
+            if not isinstance(result, dict):
+                continue
+            if not label:
+                dxcc_label = result.get("dxcc_label")
+                dxcc_entity = result.get("dxcc_entity")
+                if dxcc_label or dxcc_entity:
+                    label = {key: value for key, value in {"dxcc_label": dxcc_label, "dxcc_entity": dxcc_entity}.items() if value}
+            if not note and result.get("plugin_note"):
+                note = str(result["plugin_note"])
+            color = str(result.get("plugin_color") or "").strip()
+            if not color:
+                continue
+            if color.endswith("-soft"):
+                if not weak_color:
+                    weak_color = color
+            elif not strong_color:
+                strong_color = color
+        merged = dict(label)
+        if note:
+            merged["plugin_note"] = note
+        if strong_color:
+            merged["plugin_color"] = strong_color
+        elif weak_color and not self._has_strong_core_highlight(decode):
+            merged["plugin_color"] = weak_color
+        return merged
+
+    def _has_strong_core_highlight(self, decode: dict[str, Any]) -> bool:
+        return bool(
+            (decode.get("dxcc_entity") and decode.get("worked_dxcc") is False)
+            or (decode.get("worked_grid4") and decode.get("worked_grid") is False)
+            or decode.get("worked_call") is False
+        )
 
     def _call(self, hook: str, *args: Any) -> list[Any]:
         if not self.plugins:
@@ -283,7 +377,14 @@ class PluginManager:
         if not decodes:
             return
         self._finalized_slots.add(slot)
+        if not self.state.auto_reply_enabled:
+            logger.debug("auto reply skipped slot=%s reason=disabled", slot)
+            return
+        if not self._tx_idle():
+            logger.info("auto reply skipped slot=%s reason=tx-not-idle", slot)
+            return
         ctx = PluginContext(self, self._adif_snapshot())
+        candidates: list[tuple[int, str, dict[str, Any]]] = []
         for plugin in self.plugins:
             fn = getattr(plugin.module, "on_decode_batch", None)
             if not callable(fn):
@@ -295,11 +396,39 @@ class PluginManager:
                 continue
             decode = self._resolve_decode(target, decodes)
             if decode:
-                try:
-                    self.reply(decode)
-                except Exception as exc:
-                    logger.warning("plugin %s reply failed: %s", plugin.name, exc)
-                return
+                candidates.append((plugin.order, plugin.name, decode))
+        if not candidates:
+            return
+        if not self.state.auto_reply_enabled:
+            logger.info("auto reply skipped slot=%s reason=disabled-before-send candidates=%s", slot, [(order, name, decode.get("index")) for order, name, decode in candidates])
+            return
+        if not self._tx_idle():
+            logger.info("auto reply skipped slot=%s reason=tx-not-idle-before-send candidates=%s", slot, [(order, name, decode.get("index")) for order, name, decode in candidates])
+            return
+        order, name, decode = min(candidates, key=lambda item: (item[0], item[1]))
+        logger.info("auto reply selected plugin=%s order=%s decode_index=%s candidates=%s", name, order, decode.get("index"), [(candidate_order, candidate_name, candidate_decode.get("index")) for candidate_order, candidate_name, candidate_decode in candidates])
+        try:
+            self.reply(decode)
+        except Exception as exc:
+            logger.warning("plugin %s reply failed: %s", name, exc)
+            return
+        self._notify_auto_reply_sent(name, decode)
+
+    def _notify_auto_reply_sent(self, plugin_name: str, decode: dict[str, Any]) -> None:
+        plugin = next((candidate for candidate in self.plugins if candidate.name == plugin_name), None)
+        if plugin is None:
+            return
+        fn = getattr(plugin.module, "on_auto_reply_sent", None)
+        if not callable(fn):
+            return
+        try:
+            fn(PluginContext(self, self._adif_snapshot()), decode)
+        except Exception as exc:
+            logger.warning("plugin %s on_auto_reply_sent failed: %s", plugin.name, exc)
+
+    def _tx_idle(self) -> bool:
+        status = self.state.status
+        return not bool(status.get("tx_enabled")) and not bool(status.get("transmitting"))
 
     def _resolve_decode(self, target: Any, decodes: list[dict[str, Any]]) -> dict[str, Any] | None:
         if target is None:

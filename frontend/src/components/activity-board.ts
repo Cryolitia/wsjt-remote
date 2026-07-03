@@ -85,7 +85,7 @@ export class ActivityBoard extends LitElement {
           <td><small>${formatDt(decode.delta_time)}</small></td>
           <td><small>${formatDf(decode.delta_frequency)}</small></td>
           <td><small class=${activityMessageClass(decode, this.status.de_call)}>${renderMessageWithQrzLinks(decode.message)}</small></td>
-          <td class=${fullRowHighlight ? "" : highlightClass} style=${fullRowHighlight ? "" : style}><small>${formatDxcc(decode)}</small></td>
+          <td class=${fullRowHighlight ? "" : highlightClass} style=${fullRowHighlight ? "" : style}>${formatDxcc(decode)}</td>
           <td><small><a href="#" @click=${(event: Event) => this.replyAndWatchFromLink(event, decode)}>Reply</a></small></td>
         </tr>
       `);
@@ -107,7 +107,7 @@ export class ActivityBoard extends LitElement {
             <td><small>${formatDt(item.delta_time)}</small></td>
             <td><small>${formatDf(item.delta_frequency)}</small></td>
             <td><small class=${activityMessageClass(item, this.status.de_call)}>${renderMessageWithQrzLinks(item.message)}</small></td>
-            <td class=${fullRowHighlight ? "" : highlightClass} style=${fullRowHighlight ? "" : style}><small>${formatDxcc(item)}</small></td>
+            <td class=${fullRowHighlight ? "" : highlightClass} style=${fullRowHighlight ? "" : style}>${formatDxcc(item)}</td>
             <td>
               <small>
                 ${item.index >= 0 && !isTransmitActivity(item) ? html`<a href="#" @click=${(event: Event) => this.replyFromLink(event, item.index)}>Reply</a> · ` : null}
@@ -345,9 +345,11 @@ function formatDf(value?: number): string {
   return value === undefined ? "" : String(value);
 }
 
-function formatDxcc(decode: Decode): string {
-  if (decode.dxcc_call === "UNKNOWN") return "Unknown";
-  return decode.dxcc_label || decode.dxcc_entity || "-";
+function formatDxcc(decode: Decode) {
+  const label = decode.dxcc_call === "UNKNOWN" ? "Unknown" : decode.dxcc_label || decode.dxcc_entity || "-";
+  const lines = label.split("\n").filter((line) => line.length > 0);
+  if (lines.length <= 1) return html`<small>${label}</small>`;
+  return html`${lines[0]}<br />${lines.slice(1).map((line) => html`<small>${line}</small>`)}`;
 }
 
 function activityTimeMs(decode: Decode): number {

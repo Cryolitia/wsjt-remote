@@ -72,6 +72,7 @@ async def create_app(state: AppState, static_dir: Path) -> web.Application:
     app.router.add_post("/api/alt-n", api_alt_n)
     app.router.add_post("/api/halt-tx", api_halt_tx)
     app.router.add_post("/api/clear", api_clear)
+    app.router.add_post("/api/auto-reply", api_auto_reply)
     app.router.add_post("/api/transmits/clear", api_clear_transmits)
     app.router.add_post("/api/replay", api_replay)
     app.router.add_get("/api/debug/events", api_debug_events)
@@ -216,6 +217,15 @@ async def api_clear_transmits(request: web.Request) -> web.Response:
     state.clear_transmits()
     await request.app["broadcast"]({"event": "transmits-cleared", "data": {}})
     return json_response({"ok": True})
+
+
+async def api_auto_reply(request: web.Request) -> web.Response:
+    state: AppState = request.app["state"]
+    body = await request.json()
+    state.auto_reply_enabled = bool(body.get("enabled"))
+    logger.info("api auto-reply enabled=%s", state.auto_reply_enabled)
+    await request.app["broadcast"]({"event": "auto-reply", "data": {"enabled": state.auto_reply_enabled}})
+    return json_response({"ok": True, "enabled": state.auto_reply_enabled})
 
 
 async def api_replay(request: web.Request) -> web.Response:

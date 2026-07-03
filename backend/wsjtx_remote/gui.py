@@ -27,6 +27,11 @@ def trigger_cq_to_wsjtx(clear_dx: bool = True) -> None:
 
 def _focus_wsjtx_window() -> None:
     logger.info("querying niri windows for WSJT/JTDX")
+    focused = _niri_focused_window()
+    if focused and _matches_wsjtx(focused):
+        logger.info("current focused window is already WSJT/JTDX id=%s title=%r app_id=%r", focused.get("id"), focused.get("title", ""), focused.get("app_id", ""))
+        return
+
     windows = _niri_windows()
     window = _select_wsjtx_window(windows)
     if window is None:
@@ -55,8 +60,24 @@ def _niri_windows() -> list[dict[str, Any]]:
     return windows
 
 
+def _niri_focused_window() -> dict[str, Any] | None:
+    try:
+        result = _run(["niri", "msg", "--json", "focused-window"], "niri focused-window query failed")
+    except RuntimeError as exc:
+        logger.debug("failed to query niri focused window: %s", exc)
+        return None
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        logger.debug("failed to parse niri focused-window JSON: %s", exc)
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def _matches_wsjtx(window: dict[str, Any]) -> bool:
     app_id = _window_app_id(window)
+    if _is_blacklisted_window(window):
+        return False
     return app_id in {"jtdx", "wsjtx", "wsjt-x", "org.wsjtx.wsjtx"}
 
 
@@ -68,20 +89,28 @@ def _select_wsjtx_window(windows: list[dict[str, Any]]) -> dict[str, Any] | None
 
 
 def _wsjtx_window_score(window: dict[str, Any]) -> int:
-    title = str(window.get("title") or "").upper()
+    title = _window_title(window).upper()
     app_id = _window_app_id(window)
     score = 0
     if app_id in {"jtdx", "wsjtx", "wsjt-x", "org.wsjtx.wsjtx"}:
         score += 20
     if "JTDX  BY" in title or "WSJT-X" in title:
         score += 20
-    if "频谱" in title or "WIDE GRAPH" in title or "WATERFALL" in title:
-        score -= 40
     return score
+
+
+def _is_blacklisted_window(window: dict[str, Any]) -> bool:
+    app_id = _window_app_id(window)
+    title = _window_title(window)
+    return "sdr" in app_id or "sdr" in title or "频谱" in title or "wide graph" in title or "waterfall" in title
 
 
 def _window_app_id(window: dict[str, Any]) -> str:
     return str(window.get("app_id") or window.get("app_id_lowercase") or "").strip().lower()
+
+
+def _window_title(window: dict[str, Any]) -> str:
+    return str(window.get("title") or "").strip().lower()
 
 
 def _run(command: list[str], error_message: str) -> subprocess.CompletedProcess[str]:

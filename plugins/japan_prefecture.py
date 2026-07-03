@@ -17,6 +17,8 @@ from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
 
+ORDER = 400
+
 CALLBOOK_URL = "http://motobayashi.net/callbook/ever/20250913/offline-callbook-ja-20250913-en.csv"
 CACHE_TTL_SECONDS = 30 * 24 * 60 * 60
 CACHE_DIR = Path("/tmp/wsjt-remote/plugins/japan_prefecture")
@@ -111,23 +113,26 @@ def on_decode(ctx, decode):
     if not entry:
         return
 
-    prefecture = "日本" + entry["prefecture_zh"]
-    decode["dxcc_label"] = prefecture
-    decode["dxcc_entity"] = prefecture
+    prefecture = entry["prefecture_zh"]
+    contribution = {
+        "dxcc_label": f"日本\n{prefecture}",
+        "dxcc_entity": "Japan",
+    }
 
     code = entry["waja"]
     band = ctx.current_band()
     if code not in worked_prefectures:
-        decode["plugin_color"] = NEW_PREFECTURE_COLOR
-    elif band and code not in worked_prefectures_by_band.get(band, set()) and not _has_strong_grid(decode):
-        decode["plugin_color"] = BAND_PREFECTURE_COLOR
+        contribution["plugin_color"] = NEW_PREFECTURE_COLOR
+    elif band and code not in worked_prefectures_by_band.get(band, set()):
+        contribution["plugin_color"] = BAND_PREFECTURE_COLOR
     logger.debug(
         "japan_prefecture matched call=%s prefecture=%s band=%s color=%s",
         call,
         prefecture,
         band,
-        decode.get("plugin_color", ""),
+        contribution.get("plugin_color", ""),
     )
+    return contribution
 
 
 def _cached_callbook_path():
@@ -210,10 +215,6 @@ def _call_variants(call):
 def _is_japan_call(ctx, call):
     match = ctx.lookup_dxcc(call)
     return bool(match and match.entity == "Japan")
-
-
-def _has_strong_grid(decode):
-    return bool(decode.get("worked_grid4") and decode.get("worked_grid") is False)
 
 
 def _canonical_prefecture(value):

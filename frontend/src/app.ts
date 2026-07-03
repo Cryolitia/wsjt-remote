@@ -138,6 +138,10 @@ class WSJTXApp extends LitElement {
           <button @click=${this.cq}>CQ</button>
           <button class=${txIdle ? "secondary" : "contrast"} @click=${this.halt}>Halt TX</button>
           <button class="secondary" @click=${this.clear}>Clear</button>
+          <label>
+            <input type="checkbox" .checked=${Boolean(this.snapshot.auto_reply_enabled)} @change=${this.setAutoReply} />
+            Auto Reply
+          </label>
         </fieldset>
       </article>
       <activity-board .decodes=${this.snapshot.decodes} .transmits=${this.snapshot.transmits || []} .status=${this.snapshot.status as Status}></activity-board>
@@ -185,6 +189,10 @@ class WSJTXApp extends LitElement {
     if (payload.event === "transmit") this.activityBoard?.handleTransmit(payload.data as Decode);
     if (payload.event === "watch") this.activityBoard?.handleWatchEvent(payload.data as { action?: string; callsign?: string; decode?: Decode; auto?: boolean });
     if (payload.event === "transmits-cleared") this.activityBoard?.clearTransmits();
+    if (payload.event === "auto-reply") {
+      const data = payload.data as { enabled?: boolean };
+      this.snapshot = { ...this.snapshot, auto_reply_enabled: Boolean(data.enabled) };
+    }
     if (payload.event === "clear") {
       this.snapshot = { ...this.snapshot, decodes: [] };
       const data = payload.data as { reason?: string } | undefined;
@@ -197,6 +205,21 @@ class WSJTXApp extends LitElement {
     await this.action(() => postJson("/api/cq"), "CQ triggered with F4; Alt+N sent");
   }
   private async halt() { await this.action(() => postJson("/api/halt-tx", { auto_tx_only: false }), "Halt sent"); }
+
+  private async setAutoReply(event: Event) {
+    const enabled = (event.target as HTMLInputElement).checked;
+    await this.action(async () => {
+      const previous = Boolean(this.snapshot.auto_reply_enabled);
+      this.snapshot = { ...this.snapshot, auto_reply_enabled: enabled };
+      try {
+        await postJson("/api/auto-reply", { enabled });
+      } catch (error) {
+        this.snapshot = { ...this.snapshot, auto_reply_enabled: previous };
+        throw error;
+      }
+    }, enabled ? "Auto Reply enabled" : "Auto Reply disabled");
+  }
+
   private async clear() {
     await this.action(async () => {
       await postJson("/api/clear", { window: 2 });

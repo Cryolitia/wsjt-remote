@@ -9,6 +9,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+ORDER = 300
+
 CHINA_PROVINCE_RANGES = (
     ("1", "A", "X", "北京"),
     ("2", "A", "H", "黑龙江"),
@@ -73,15 +75,18 @@ def on_decode(ctx, decode):
     if not province:
         return
 
-    decode["dxcc_label"] = province
-    decode["dxcc_entity"] = province
+    contribution = {
+        "dxcc_label": f"中国\n{province}",
+        "dxcc_entity": "China",
+    }
 
     band = ctx.current_band()
     if province not in worked_provinces:
-        decode["plugin_color"] = NEW_PROVINCE_COLOR
-    elif band and province not in worked_provinces_by_band.get(band, set()) and not _has_strong_grid(decode):
-        decode["plugin_color"] = BAND_PROVINCE_COLOR
-    logger.debug("china_province matched call=%s province=%s band=%s color=%s", call, province, band, decode.get("plugin_color", ""))
+        contribution["plugin_color"] = NEW_PROVINCE_COLOR
+    elif band and province not in worked_provinces_by_band.get(band, set()):
+        contribution["plugin_color"] = BAND_PROVINCE_COLOR
+    logger.debug("china_province matched call=%s province=%s band=%s color=%s", call, province, band, contribution.get("plugin_color", ""))
+    return contribution
 
 
 def _rebuild_worked_areas(ctx):
@@ -107,10 +112,6 @@ def _rebuild_worked_areas(ctx):
 def _is_china_call(ctx, call):
     match = ctx.lookup_dxcc(call)
     return bool(match and match.entity == "China")
-
-
-def _has_strong_grid(decode):
-    return bool(decode.get("worked_grid4") and decode.get("worked_grid") is False)
 
 
 def _china_province(call):
@@ -139,5 +140,5 @@ def _province_from_candidate(call):
             continue
         for area, start, end, province in CHINA_PROVINCE_RANGES:
             if char == area and start <= suffix_first <= end:
-                return "中国" + province
+                return province
     return ""

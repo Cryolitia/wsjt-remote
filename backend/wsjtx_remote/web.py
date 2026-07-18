@@ -9,7 +9,7 @@ from typing import Any, Awaitable, Callable
 from aiohttp import web, WSCloseCode, WSMsgType
 
 from . import protocol
-from .gui import send_alt_n_to_wsjtx, trigger_cq_to_wsjtx
+from .gui import send_alt_n_to_wsjtx
 from .state import AppState
 from .udp import send_datagram
 
@@ -152,14 +152,11 @@ async def _send(request: web.Request, data: bytes) -> web.Response:
 
 async def api_cq(request: web.Request) -> web.Response:
     state: AppState = request.app["state"]
-    clear_dx = bool(str(state.status.get("dx_call") or "").strip() or str(state.status.get("dx_grid") or "").strip())
-    logger.info("api cq requested")
-    try:
-        trigger_cq_to_wsjtx(clear_dx=clear_dx)
-    except RuntimeError as exc:
-        logger.warning("api cq failed: %s", exc)
-        return json_response({"error": str(exc)}, status=500)
-    return json_response({"ok": True})
+    own_call = str(state.status.get("de_call") or "").strip().upper()
+    own_grid = str(state.status.get("de_grid") or "").strip().upper()[:4]
+    text = " ".join(part for part in ("CQ", own_call, own_grid) if part)
+    logger.info("api cq free-text text=%r", text)
+    return await _send(request, protocol.build_free_text(state.remote.id, text, True, state.remote.schema))
 
 
 async def api_free_text(request: web.Request) -> web.Response:

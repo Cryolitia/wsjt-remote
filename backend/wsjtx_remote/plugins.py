@@ -13,7 +13,7 @@ from typing import Any
 from . import protocol
 from .adif_index import band_from_adif_freq, band_from_hz, dxcc_key, normalize_grid
 from .dxcc import normalize_call
-from .state import AppState, extract_decode_callsign, extract_decode_grid, is_call, is_calling_own, is_grid, is_repliable
+from .state import AppState, extract_decode_callsign, extract_decode_grid, is_call, is_calling_own, is_cq_transmit_status, is_grid, is_repliable
 
 
 logger = logging.getLogger(__name__)
@@ -373,8 +373,8 @@ class PluginManager:
         if not self.state.auto_reply_enabled:
             logger.debug("auto reply skipped slot=%s reason=disabled", slot)
             return
-        if not self._tx_idle():
-            logger.info("auto reply skipped slot=%s reason=tx-not-idle", slot)
+        if not self._can_auto_reply():
+            logger.info("auto reply skipped slot=%s reason=tx-busy-non-cq", slot)
             return
         ctx = PluginContext(self, self._adif_snapshot())
         candidates: list[tuple[int, str, dict[str, Any]]] = []
@@ -395,8 +395,8 @@ class PluginManager:
         if not self.state.auto_reply_enabled:
             logger.info("auto reply skipped slot=%s reason=disabled-before-send candidates=%s", slot, [(order, name, decode.get("index")) for order, name, decode in candidates])
             return
-        if not self._tx_idle():
-            logger.info("auto reply skipped slot=%s reason=tx-not-idle-before-send candidates=%s", slot, [(order, name, decode.get("index")) for order, name, decode in candidates])
+        if not self._can_auto_reply():
+            logger.info("auto reply skipped slot=%s reason=tx-busy-non-cq-before-send candidates=%s", slot, [(order, name, decode.get("index")) for order, name, decode in candidates])
             return
         order, name, decode = min(candidates, key=lambda item: (item[0], item[1]))
         logger.info("auto reply selected plugin=%s order=%s decode_index=%s candidates=%s", name, order, decode.get("index"), [(candidate_order, candidate_name, candidate_decode.get("index")) for candidate_order, candidate_name, candidate_decode in candidates])
@@ -419,9 +419,10 @@ class PluginManager:
         except Exception as exc:
             logger.warning("plugin %s on_auto_reply_sent failed: %s", plugin.name, exc)
 
-    def _tx_idle(self) -> bool:
+    def _can_auto_reply(self) -> bool:
         status = self.state.status
-        return not bool(status.get("tx_enabled")) and not bool(status.get("transmitting"))
+        tx_idle = not bool(status.get("tx_enabled")) and not bool(status.get("transmitting"))
+        return tx_idle or is_cq_transmit_status(status)
 
     def _resolve_decode(self, target: Any, decodes: list[dict[str, Any]]) -> dict[str, Any] | None:
         if target is None:

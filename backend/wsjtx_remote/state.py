@@ -222,6 +222,17 @@ def transmit_message(status: dict[str, Any]) -> str:
     return f"{dx_call} {own_call or 'UNKNOWN'} UNKNOWN"
 
 
+def is_cq_message(message: str) -> bool:
+    words = str(message or "").upper().split()
+    return bool(words) and words[0] == "CQ"
+
+
+def is_cq_transmit_status(status: dict[str, Any]) -> bool:
+    if is_cq_message(transmit_message(status)):
+        return True
+    return not str(status.get("dx_call") or "").strip()
+
+
 def extract_decode_callsign(message: str, own_call: str) -> str:
     words = [word for word in message.upper().split() if word]
     own = own_call.upper()

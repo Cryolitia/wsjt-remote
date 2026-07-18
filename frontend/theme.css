@@ -631,6 +631,10 @@ table {
   --pico-font-size: 92%;
 }
 
+.activity-panel--all {
+  min-height: calc(25 * 2rem);
+}
+
 thead th,
 tbody tr > th[colspan] {
   background: var(--app-surface-raised);

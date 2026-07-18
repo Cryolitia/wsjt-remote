@@ -26,7 +26,7 @@ export class ActivityBoard extends LitElement {
     return html`
       ${this.message ? html`<div class="toast-stack toast-stack--above"><div class="toast">${this.message}</div></div>` : null}
       <div class="grid">
-        <article>
+        <article class="activity-panel--all">
           <header>
             <nav>
               <ul><li><strong>All Activity</strong></li></ul>

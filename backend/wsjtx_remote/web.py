@@ -155,8 +155,16 @@ async def api_cq(request: web.Request) -> web.Response:
     own_call = str(state.status.get("de_call") or "").strip().upper()
     own_grid = str(state.status.get("de_grid") or "").strip().upper()[:4]
     text = " ".join(part for part in ("CQ", own_call, own_grid) if part)
-    logger.info("api cq free-text text=%r", text)
-    return await _send(request, protocol.build_free_text(state.remote.id, text, True, state.remote.schema))
+    trigger_alt_n = not bool(state.status.get("tx_enabled"))
+    logger.info("api cq free-text text=%r trigger_alt_n=%s", text, trigger_alt_n)
+    response = await _send(request, protocol.build_free_text(state.remote.id, text, True, state.remote.schema))
+    if response.status < 400 and trigger_alt_n:
+        try:
+            send_alt_n_to_wsjtx()
+        except RuntimeError as exc:
+            logger.warning("api cq Alt+N failed after FreeText: %s", exc)
+            return json_response({"error": str(exc)}, status=500)
+    return response
 
 
 async def api_free_text(request: web.Request) -> web.Response:

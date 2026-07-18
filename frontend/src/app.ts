@@ -202,7 +202,7 @@ class WSJTXApp extends LitElement {
   }
 
   private async cq() {
-    await this.action(() => postJson("/api/cq"), "CQ FreeText sent");
+    await this.action(() => postJson("/api/cq"), "CQ requested");
   }
   private async halt() { await this.action(() => postJson("/api/halt-tx", { auto_tx_only: false }), "Halt sent"); }
 

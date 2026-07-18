@@ -9,6 +9,10 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+WSJT_APP_IDS = {"jtdx", "wsjtx", "wsjt-x", "wsjt-z", "wsjtz", "org.wsjtx.wsjtx"}
+WSJT_TITLE_TOKENS = ("jtdx", "wsjt-x", "wsjt-z")
+WSJT_AUX_TITLE_TOKENS = ("频谱", "wide graph", "waterfall")
+
 
 def send_alt_n_to_wsjtx() -> None:
     _focus_wsjtx_window()
@@ -45,6 +49,7 @@ def _focus_wsjtx_window() -> None:
 
     logger.info("focusing WSJT/JTDX window id=%s title=%r app_id=%r", window_id, window.get("title", ""), window.get("app_id", ""))
     _run(["niri", "msg", "action", "focus-window", "--id", str(window_id)], "niri focus-window failed")
+    time.sleep(0.1)
 
 
 def _niri_windows() -> list[dict[str, Any]]:
@@ -76,9 +81,10 @@ def _niri_focused_window() -> dict[str, Any] | None:
 
 def _matches_wsjtx(window: dict[str, Any]) -> bool:
     app_id = _window_app_id(window)
+    title = _window_title(window)
     if _is_blacklisted_window(window):
         return False
-    return app_id in {"jtdx", "wsjtx", "wsjt-x", "org.wsjtx.wsjtx"}
+    return app_id in WSJT_APP_IDS or any(token in title for token in WSJT_TITLE_TOKENS)
 
 
 def _select_wsjtx_window(windows: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -89,20 +95,24 @@ def _select_wsjtx_window(windows: list[dict[str, Any]]) -> dict[str, Any] | None
 
 
 def _wsjtx_window_score(window: dict[str, Any]) -> int:
-    title = _window_title(window).upper()
+    title = _window_title(window)
     app_id = _window_app_id(window)
     score = 0
-    if app_id in {"jtdx", "wsjtx", "wsjt-x", "org.wsjtx.wsjtx"}:
+    if app_id in WSJT_APP_IDS:
         score += 20
-    if "JTDX  BY" in title or "WSJT-X" in title:
+    if any(token in title for token in WSJT_TITLE_TOKENS):
         score += 20
+    if "wsjt-z mod" in title:
+        score += 10
+    if any(token in title for token in WSJT_AUX_TITLE_TOKENS):
+        score -= 100
     return score
 
 
 def _is_blacklisted_window(window: dict[str, Any]) -> bool:
     app_id = _window_app_id(window)
     title = _window_title(window)
-    return "sdr" in app_id or "sdr" in title or "频谱" in title or "wide graph" in title or "waterfall" in title
+    return "sdr" in app_id or "sdr" in title or any(token in title for token in WSJT_AUX_TITLE_TOKENS)
 
 
 def _window_app_id(window: dict[str, Any]) -> str:

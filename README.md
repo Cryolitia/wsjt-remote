@@ -173,7 +173,7 @@ The value is stored in browser `localStorage`.
 
 ## CQ And Enable Tx
 
-The `CQ` button uses Niri IPC to focus the WSJT-X/JTDX main window and sends keyboard shortcuts with `wtype`. If the current DX call/grid is populated, it sends `F4` before `Alt+N`; otherwise it sends only `Alt+N`.
+The `CQ` button sends a UDP `FreeText` message with `CQ {DE call} {grid4}`. If transmit is not already enabled, it then uses Niri IPC and `wtype` to send `Alt+N` to the WSJT-X/JTDX/WSJT-Z main window.
 
 ## Plugins
 
